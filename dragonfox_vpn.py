@@ -10,7 +10,7 @@ and robust background network state management. Supports Linux and Windows.
 Copyright (c) 2026 DragonFox Studios
 """
 
-__version__ = "1.0.1.31"
+__version__ = "1.0.1.33"
 
 import datetime
 import json
@@ -24,6 +24,13 @@ import sys
 import time
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
+
+try:
+    import winreg
+except ImportError:
+    winreg = None
+
+
 
 import requests
 import urllib3
@@ -402,6 +409,48 @@ class FlagLoaderThread(QThread):
             IconManager.fetch_flag(code)
             self.icon_ready.emit(code)
 
+
+# --- Auto-Start Manager ---
+class AutoStartManager:
+    """Manages start-on-boot functionality via Windows Registry."""
+    APP_NAME = "DragonFoxVPN"
+    
+    @staticmethod
+    def is_available() -> bool:
+        return platform.system() == "Windows"
+    
+    @staticmethod
+    def is_enabled() -> bool:
+        if not AutoStartManager.is_available(): return False
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ)
+            value, _ = winreg.QueryValueEx(key, AutoStartManager.APP_NAME)
+            winreg.CloseKey(key)
+            # Check if path in registry matches current executable
+            # In a frozen app, sys.executable is the .exe path
+            return str(value).lower() == sys.executable.lower()
+        except FileNotFoundError:
+            return False
+        except Exception as e:
+            logger.error(f"Error checking autostart: {e}")
+            return False
+
+    @staticmethod
+    def set_autostart(enable: bool):
+        if not AutoStartManager.is_available(): return
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+        try:
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+            if enable:
+                winreg.SetValueEx(key, AutoStartManager.APP_NAME, 0, winreg.KEY_SZ, sys.executable)
+            else:
+                try:
+                    winreg.DeleteValue(key, AutoStartManager.APP_NAME)
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception as e:
+            logger.error(f"Failed to set autostart: {e}")
 
 # --- Configuration Manager ---
 class ConfigManager:
@@ -894,11 +943,20 @@ class VPNTrayApp(QApplication):
         self.action_autoconnect.setChecked(config_manager.get("auto_connect"))
         self.action_autoconnect.triggered.connect(self.toggle_autoconnect)
         
+        self.action_autostart = QAction("Run on Startup", self)
+        self.action_autostart.setCheckable(True)
+        if AutoStartManager.is_available():
+            self.action_autostart.setChecked(AutoStartManager.is_enabled())
+            self.action_autostart.triggered.connect(self.toggle_autostart)
+        else:
+            self.action_autostart.setEnabled(False)
+            self.action_autostart.setText("Run on Startup (Windows only)")
+        
         self.action_exit = QAction("Exit", self)
         self.action_exit.triggered.connect(self.on_exit)
         
         items = [self.action_dashboard, None, self.action_enable, self.action_disable, 
-                 None, self.action_location, self.action_autoconnect, None, self.action_exit]
+                 None, self.action_location, self.action_autoconnect, self.action_autostart, None, self.action_exit]
         for item in items:
             if item is None: self.menu.addSeparator()
             else: self.menu.addAction(item)
@@ -950,6 +1008,9 @@ class VPNTrayApp(QApplication):
 
     def toggle_autoconnect(self):
         config_manager.set("auto_connect", self.action_autoconnect.isChecked())
+        
+    def toggle_autostart(self):
+        AutoStartManager.set_autostart(self.action_autostart.isChecked())
     
     def on_enable(self):
         logger.info("Enabling VPN routing...")
