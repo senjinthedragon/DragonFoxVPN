@@ -5,12 +5,20 @@ DragonFox VPN Tray Application
 
 A professional-grade system tray utility for managing VPN connections.
 Features a modern dark UI, location switching, auto-connect capabilities,
-and robust background network state management. Supports Linux and Windows.
+and robust background network state management.
+
+Key Components:
+- SystemHandler: OS-level routing and network commands.
+- VPNApi: Interacts with the backend to fetch nodes.
+- VPNTrayApp: Main Qt application controller.
+- AutoStartManager: Windows Registry management for startup.
+
+Supports Linux (native tools) and Windows (PowerShell/Netsh).
 
 Copyright (c) 2026 DragonFox Studios
 """
 
-__version__ = "1.0.1.33"
+__version__ = "1.0.1.34"
 
 import datetime
 import json
@@ -177,7 +185,12 @@ STYLESHEET = """
 
 # --- Global State ---
 class AppState:
-    """Manages the current state of the application."""
+    """
+    Global Static State Container.
+    
+    Acts as a central store for the transient runtime state of the application.
+    Shared across threads and UI components to maintain synchronization.
+    """
     vpn_state: str = "Disabled"
     vpn_location: str = "Unknown"
     connection_start_time: Optional[datetime.datetime] = None
@@ -192,7 +205,15 @@ class AppState:
 
 # --- System Operations ---
 class SystemHandler:
-    """Handles OS-specific operations like routing and DNS."""
+    """
+    OS Abstraction Layer.
+    
+    Encapsulates all system-level command executions. Detects the operating system
+    (Windows vs Linux) and dispatches the appropriate terminal commands for:
+    - Routing table modification
+    - DNS configuration
+    - Interface detection
+    """
     
     @staticmethod
     def run_command(cmd: str, check: bool = True) -> Tuple[str, str, int]:
@@ -454,7 +475,12 @@ class AutoStartManager:
 
 # --- Configuration Manager ---
 class ConfigManager:
-    """Manages persistent configuration settings."""
+    """
+    Persistent Configuration Store.
+    
+    Handles loading and saving of user preferences (favorites, last location,
+    auto-connect settings) to a JSON file in the user's config directory.
+    """
     def __init__(self):
         self.config = {
             "favorites": [],
