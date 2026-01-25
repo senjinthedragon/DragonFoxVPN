@@ -10,6 +10,8 @@ and robust background network state management. Supports Linux and Windows.
 Copyright (c) 2026 DragonFox Studios
 """
 
+__version__ = "1.0.1.30"
+
 import datetime
 import json
 import logging
@@ -26,12 +28,14 @@ from typing import List, Tuple, Optional, Dict, Any
 import requests
 import urllib3
 from bs4 import BeautifulSoup
-from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal, QSize, QPoint, QObject
-from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QBrush, QPen, QRadialGradient
+from PyQt5.QtCore import QTimer, Qt, QThread, pyqtSignal, QSize, QPoint, QObject, QUrl
+from PyQt5.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QBrush, QPen, QRadialGradient, QImage
 from PyQt5.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QAction, QDialog,
                              QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QWidget,
                              QMessageBox, QListWidget, QListWidgetItem, QLineEdit,
-                             QAbstractItemView, QFrame, QProgressBar)
+                             QAbstractItemView, QFrame, QProgressBar, QStyle)
+import pycountry
+
 
 # --- Logging Configuration ---
 logging.basicConfig(
@@ -109,7 +113,16 @@ STYLESHEET = """
     QListWidget::item:hover {
         background-color: #2a2d2e;
     }
+    QListWidget::item#header {
+        background-color: #333333;
+        color: #aaaaaa;
+        font-weight: bold;
+        border-bottom: 2px solid #444;
+        padding-top: 10px;
+        padding-bottom: 5px;
+    }
     QPushButton {
+
         background-color: #0e639c;
         color: white;
         border: none;
@@ -308,6 +321,87 @@ def create_status_icon(color_name: str) -> QIcon:
     
     painter.end()
     return QIcon(pixmap)
+
+# --- Icon & Flag Manager ---
+class IconManager:
+    """Manages fetching and caching of flag icons."""
+    CACHE_DIR = Config.get_config_path().parent / "flags"
+    
+    @staticmethod
+    def get_flag_icon(country_name: str) -> Tuple[Optional[QIcon], str]:
+        """Returns QIcon for a country, fetching it if necessary.
+           Returns (QIcon, iso_code) or (None, '')."""
+        
+        # Manual overrides for non-standard names
+        overrides = {
+            "usa": "us", "uk": "gb", "south korea": "kr", "russia": "ru",
+            "czech republic": "cz", "north macedonia": "mk", "moldova": "md",
+            "laos": "la", "vietnam": "vn", "tanzania": "tz", "bolivia": "bo",
+            "venezuela": "ve", "iran": "ir", "syria": "sy", "brunei": "bn",
+            "cape verde": "cv", "congo": "cg", "democratic republic of the congo": "cd",
+            "swaziland": "sz", "timor-leste": "tl", "vatican city": "va",
+            "palestine": "ps", "taiwan": "tw", "hong kong": "hk", "macau": "mo",
+            "india via singapore": "in", "india via uk": "in", "india via uk": "in" 
+        }
+        
+        norm_name = country_name.lower().strip()
+        iso_code = overrides.get(norm_name)
+        
+        if not iso_code:
+            try:
+                # Try explicit lookup first
+                c = pycountry.countries.get(name=country_name)
+                if not c:
+                    # Try fuzzy search
+                    matches = pycountry.countries.search_fuzzy(country_name)
+                    if matches:
+                        c = matches[0]
+                
+                if c:
+                    iso_code = c.alpha_2.lower()
+            except LookupError:
+                pass
+        
+        if not iso_code:
+            return None, ""
+            
+        IconManager.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        flag_path = IconManager.CACHE_DIR / f"{iso_code}.png"
+        
+        if flag_path.exists():
+            return QIcon(str(flag_path)), iso_code
+            
+        return None, iso_code
+
+    @staticmethod
+    def fetch_flag(iso_code: str):
+        """Fetches flag from CDN and saves to cache. Intended to run in a thread."""
+        if not iso_code: return
+        try:
+            IconManager.CACHE_DIR.mkdir(parents=True, exist_ok=True)
+            flag_path = IconManager.CACHE_DIR / f"{iso_code}.png"
+            if not flag_path.exists():
+                url = f"https://flagcdn.com/48x36/{iso_code}.png"
+                resp = requests.get(url, timeout=5)
+                if resp.status_code == 200:
+                    with open(flag_path, 'wb') as f:
+                        f.write(resp.content)
+        except Exception as e:
+            logger.error(f"Failed to fetch flag for {iso_code}: {e}")
+
+class FlagLoaderThread(QThread):
+    """Worker to fetch flags in background to avoid UI freeze."""
+    icon_ready = pyqtSignal(str) # Emits iso_code when ready
+    
+    def __init__(self, iso_codes):
+        super().__init__()
+        self.iso_codes = set(iso_codes)
+        
+    def run(self):
+        for code in self.iso_codes:
+            IconManager.fetch_flag(code)
+            self.icon_ready.emit(code)
+
 
 # --- Configuration Manager ---
 class ConfigManager:
@@ -550,24 +644,100 @@ class ModernLocationDialog(QDialog):
                     self.on_item_clicked(item)
                     break
 
+    def update_icons(self, iso_code):
+        """Called when a flag icon is downloaded/ready."""
+        # Find all items with this iso_code
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.data(Qt.UserRole + 2) == iso_code:
+                icon_path = IconManager.CACHE_DIR / f"{iso_code}.png"
+                if icon_path.exists():
+                    item.setIcon(QIcon(str(icon_path)))
+
     def populate_list(self, filter_text=""):
         self.list_widget.clear()
         filter_text = filter_text.lower()
-        sorted_locs = sorted(self.locations, key=lambda x: (not config_manager.is_favorite(x['label']), x['label']))
+        
+        # Sort by: Favorite -> Continent -> Label
+        sorted_locs = sorted(self.locations, key=lambda x: (
+            not config_manager.is_favorite(x['label']), 
+            x.get('continent', 'Other'), 
+            x['label']
+        ))
+        
+        current_fav_status = None
+        current_continent = None
+        
+        needed_flags = set()
         
         for loc in sorted_locs:
             if filter_text and filter_text not in loc['label'].lower():
                 continue
-            emoji = VPNApi.COUNTRY_EMOJIS.get(loc['country'], '🏳')
-            display_text = f"{emoji}  {loc['label']}"
-            if config_manager.is_favorite(loc['label']):
-                display_text = "⭐ " + display_text
+                
+            # Headers Logic
+            is_fav = config_manager.is_favorite(loc['label'])
+            continent = loc.get('continent', 'Other')
+            
+            # Add Favorite Header
+            if is_fav != current_fav_status:
+                current_fav_status = is_fav
+                text = "Favorites" if is_fav else "All Locations"
+                # If we switched to non-favorites, we reset continent tracking to force header
+                if not is_fav:
+                    current_continent = None
+                    # Only show "All Locations" if we had favorites
+                    if any(config_manager.is_favorite(l['label']) for l in self.locations):
+                        self.add_header("All Locations")
+                elif is_fav:
+                    self.add_header("Favorites")
+            
+            # Add Continent Header (only for non-favorites usually, or grouped within favorites)
+            if not is_fav and continent != current_continent:
+                current_continent = continent
+                self.add_header(continent)
+                
+            # Try to get Icon
+            icon, iso_code = IconManager.get_flag_icon(loc['country'])
+            if iso_code and not icon:
+                needed_flags.add(iso_code)
+                
+            display_text = loc['label']
+            if is_fav:
+                 display_text = "⭐ " + display_text
+            
+            # If no icon available yet, and we are on Windows, we might want to avoid the ugly unicode
+            # But the original code was: emoji + label.
+            # If icon is present, use it.
             
             item = QListWidgetItem(display_text)
+            if icon:
+                item.setIcon(icon)
+            
             item.setData(Qt.UserRole, loc['value'])
             item.setData(Qt.UserRole + 1, loc['label'])
+            item.setData(Qt.UserRole + 2, iso_code) # Store ISO code for async update
+            
             self.list_widget.addItem(item)
+            
+        if needed_flags:
+            self.flag_loader = FlagLoaderThread(list(needed_flags))
+            self.flag_loader.icon_ready.connect(self.update_icons)
+            self.flag_loader.start()
 
+    def add_header(self, text):
+        item = QListWidgetItem(text)
+        item.setFlags(Qt.NoItemFlags) # Non-selectable
+        item.setData(Qt.UserRole, "header")
+        # Use custom styling via QSS ID selector simulation or iterate in paint?
+        # QListWidget doesn't support IDs per item easily. 
+        # But we added QListWidget::item#header in CSS? No, that selector won't work on ITEM.
+        # We have to set property or use setBackground.
+        item.setForeground(QBrush(QColor("#aaaaaa")))
+        item.setBackground(QColor("#333333"))
+        font = item.font()
+        font.setBold(True)
+        item.setFont(font)
+        self.list_widget.addItem(item)
     def filter_locations(self, text):
         self.populate_list(text)
 
