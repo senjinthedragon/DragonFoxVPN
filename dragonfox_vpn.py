@@ -10,7 +10,7 @@ and robust background network state management. Supports Linux and Windows.
 Copyright (c) 2026 DragonFox Studios
 """
 
-__version__ = "1.0.1.30"
+__version__ = "1.0.1.31"
 
 import datetime
 import json

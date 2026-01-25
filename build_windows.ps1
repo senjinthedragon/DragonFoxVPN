@@ -7,7 +7,7 @@ Write-Host "Updating version..."
 python increment_version.py
 
 Write-Host "Building DragonFoxVPN Tray..."
-pyinstaller --clean --noconsole --onefile --uac-admin --icon="app.ico" --version-file="version_info.txt" --name="DragonFoxVPN Tray" dragonfox_vpn.py
+pyinstaller --clean --noconsole --onefile --uac-admin --icon="app.ico" --version-file="version_info.txt" --name="DragonFoxVPN Tray" --exclude-module tkinter --exclude-module unittest --exclude-module pydoc --exclude-module difflib --exclude-module doctest dragonfox_vpn.py
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Build successful! Executable is in dist\DragonFoxVPN Tray.exe"
