@@ -1,0 +1,3 @@
+Invoke-ps2exe '.\DragonFoxVPN Tray.ps1' '.\DragonFoxVPN Tray.exe' -x64 -noConsole -iconFile 'DragonFoxVPN Tray.ico' -title 'DragonFoxVPN Tray' -description 'VPN Management Tray for the DragonFoxVPN network service.' -company 'DragonFox' -product 'DragonFoxVPN' -copyright '(c)2025 DragonFox Inc.' -version '1.0.0' -DPIAware -requireAdmin
+$cert = Get-ChildItem Cert:\CurrentUser\My | Where-Object {$_.Subject -eq "CN=DragonFoxVPN"}
+Set-AuthenticodeSignature -FilePath "D:\Dropbox\DragonFoxVPN Tray\DragonFoxVPN Tray.exe" -Certificate $cert
