@@ -18,7 +18,7 @@ Supports Linux (native tools) and Windows (PowerShell/Netsh).
 Copyright (c) 2026 DragonFox Studios
 """
 
-__version__ = "1.0.1.34"
+__version__ = "1.0.1.39"
 
 import datetime
 import json
@@ -447,9 +447,15 @@ class AutoStartManager:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_READ)
             value, _ = winreg.QueryValueEx(key, AutoStartManager.APP_NAME)
             winreg.CloseKey(key)
-            # Check if path in registry matches current executable
-            # In a frozen app, sys.executable is the .exe path
-            return str(value).lower() == sys.executable.lower()
+            
+            # Normalize registry value (remove surrounding quotes if present)
+            reg_path = str(value).strip('"').strip("'")
+            
+            # Normalize both paths for comparison
+            p1 = os.path.normcase(os.path.abspath(reg_path))
+            p2 = os.path.normcase(os.path.abspath(sys.executable))
+            
+            return p1 == p2
         except FileNotFoundError:
             return False
         except Exception as e:
@@ -461,9 +467,14 @@ class AutoStartManager:
         if not AutoStartManager.is_available(): return
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_ALL_ACCESS)
+            # properly quote path if it has spaces
+            exe_path = sys.executable
+            if " " in exe_path and not exe_path.startswith('"'):
+                exe_path = f'"{exe_path}"'
+            
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
             if enable:
-                winreg.SetValueEx(key, AutoStartManager.APP_NAME, 0, winreg.KEY_SZ, sys.executable)
+                winreg.SetValueEx(key, AutoStartManager.APP_NAME, 0, winreg.REG_SZ, exe_path)
             else:
                 try:
                     winreg.DeleteValue(key, AutoStartManager.APP_NAME)
