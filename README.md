@@ -1,6 +1,6 @@
 # DragonFoxVPN Tray
 
-A professional-grade system tray utility for managing VPN connections with a modern dark UI.
+A system tray utility for managing VPN connections with a modern dark UI.
 
 Designed to work on **Windows 10/11** and **Linux (Garuda/Arch/Debian)**. Built around a
 **Raspberry Pi gateway** architecture where a Pi running OpenVPN sits between your LAN and the
@@ -9,38 +9,38 @@ internet, with this tray app managing routing on each client machine.
 > **VPN provider**: The included backend is written for **ExpressVPN** `.ovpn` configs, but the
 > shell script and web UI are straightforward to adapt to any OpenVPN-compatible provider.
 
-## ✨ Features
+## Features
 
-- **🌍 Location Switching**:
-    - Searchable dialog with **flags** 🇺🇸 🇬🇧 🇫🇷 🇩🇪
+- **Location Switching**:
+    - Searchable dialog with flags
     - Grouped by continent (Europe, Asia, Americas, etc.)
-    - Favorites system ⭐
-- **⚡ Smart Automation**:
+    - Favorites system
+- **Smart Automation**:
     - **Auto-Connect**: Connects to the last used location on app launch.
     - **Auto-Start**: (Windows) Option to launch automatically on system login.
-- **🔒 Security & Safety**:
+- **Security & Safety**:
     - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly.
     - **Drop Debouncing**: Requires two consecutive failed checks before triggering the kill switch, avoiding false positives.
     - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
-- **📊 Real-time Monitoring**:
+- **Real-time Monitoring**:
     - Dashboard showing connection status, gateway IP, and session duration.
-    - Tray icon changes color based on status (🟢 Connected, 🟡 Disabled, 🔴 Dropped, ⚫ Server Unreachable).
+    - Tray icon changes color based on status (green=Connected, yellow=Disabled, red=Dropped, black=Server Unreachable).
 
-## 🏗️ Architecture
+## Architecture
 
 ```
-[Client PC]  ──→  [Raspberry Pi (OpenVPN gateway)]  ──→  [Internet via VPN]
+[Client PC]  -->  [Raspberry Pi (OpenVPN gateway)]  -->  [Internet via VPN]
   tray app            backend web UI + switch script
 ```
 
 The tray app modifies the **client machine's** routing table to send all traffic through the Pi.
 The Pi runs OpenVPN and a small PHP web UI (`backend/`) that the tray app queries to fetch
 available locations and trigger server switches. Each client machine runs the tray app
-independently — no router configuration required.
+independently - no router configuration required.
 
 ---
 
-## 🖥️ Backend Setup (Raspberry Pi)
+## Backend Setup (Raspberry Pi)
 
 ### Prerequisites
 
@@ -65,8 +65,8 @@ The file is well-commented. The values you'll need to change are:
 
 | Setting | How to find it |
 |---|---|
-| `LAN_IF` | Run `ip link` — it's the interface with your LAN IP (usually `eth0`) |
-| `LAN_NET` | Your router's subnet, e.g. `192.168.1.0/24` — check your router's DHCP settings |
+| `LAN_IF` | Run `ip link` - it's the interface with your LAN IP (usually `eth0`) |
+| `LAN_NET` | Your router's subnet, e.g. `192.168.1.0/24` - check your router's DHCP settings |
 | `PI_IP` | The Pi's own LAN IP address |
 | `CONF_PREFIX` | The common prefix of your `.ovpn` filenames, e.g. `my_expressvpn_` |
 
@@ -86,9 +86,9 @@ sudo mkdir -p /etc/openvpn/client/configs
 sudo cp *.ovpn /etc/openvpn/client/configs/
 ```
 
-> **ExpressVPN users**: Log into your account → Downloads → Manual Config → OpenVPN.
+> **ExpressVPN users**: Log into your account -> Downloads -> Manual Config -> OpenVPN.
 > Download the configs for the locations you want and copy them to the Pi.
-> Each user must download their own — the files contain account-specific credentials.
+> Each user must download their own - the files contain account-specific credentials.
 
 ### 4. Set up the routing script
 
@@ -117,7 +117,7 @@ sudo chmod 600 /etc/openvpn/client/credentials.txt
 
 > **Providers with embedded credentials**: Some providers include credentials directly inside
 > the `.ovpn` files rather than using a separate auth file. If yours does, comment out the
-> `auth-user-pass` line in `common.conf` — otherwise OpenVPN will fail to start.
+> `auth-user-pass` line in `common.conf` - otherwise OpenVPN will fail to start.
 
 ### 6. Install and enable the switch script
 
@@ -153,8 +153,8 @@ sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf
 ```
 
 Open the file and edit two lines to match your setup:
-- `ServerName` — the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
-- `Require ip` — your LAN subnet (e.g. `192.168.1.0/24`)
+- `ServerName` - the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
+- `Require ip` - your LAN subnet (e.g. `192.168.1.0/24`)
 
 ```bash
 sudo a2ensite vpn
@@ -163,7 +163,7 @@ sudo systemctl reload apache2
 
 ---
 
-## 💻 Tray App Setup
+## Tray App Setup
 
 ### Prerequisites
 
@@ -206,11 +206,11 @@ On first launch the app shows a setup dialog. Here's what each field means:
 | Field | What to enter |
 |---|---|
 | **VPN Gateway IP** | Your Pi's LAN IP address (the same IP you SSH into it with) |
-| **ISP Gateway IP** | Your router's LAN IP — usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
-| **DNS Server** | Enter the same IP as your VPN Gateway — the Pi handles DNS when connected |
+| **ISP Gateway IP** | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
+| **DNS Server** | Enter the same IP as your VPN Gateway - the Pi handles DNS when connected |
 | **VPN Switcher URL** | `http://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20` |
 
-Settings are saved to the config file and can be changed later via **⚙️ Settings...** in the tray menu.
+Settings are saved to the config file and can be changed later via **Settings...** in the tray menu.
 
 ### Building for Windows
 
@@ -225,7 +225,7 @@ The project includes a fully automated build script:
 
 The build script auto-increments the build number and embeds version metadata. Requires `app.ico` and `version_info.txt` in the root directory.
 
-## 🚀 Running
+## Running
 
 ### Windows
 Run `DragonFoxVPN Tray.exe` as **Administrator** (required to modify the routing table and network settings).
@@ -236,7 +236,7 @@ python dragonfox_vpn.py
 ```
 (No sudo needed if you followed the sudoers step above.)
 
-## ⚙️ Configuration
+## Configuration
 
 The application stores its configuration in:
 
@@ -247,7 +247,7 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Web UI not accessible
 - Confirm Apache is running: `sudo systemctl status apache2`
@@ -264,10 +264,10 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 ### Location switching does nothing
 - Confirm the sudoers entry for `www-data` is in place: `sudo cat /etc/sudoers.d/switch-openvpn`
 - Test the script manually: `sudo /usr/local/bin/switch-openvpn.sh --refresh`
-- Check Apache error log: `sudo tail /var/log/apache2/vpn.hatchling.org.error.log`
+- Check Apache error log: `sudo tail /var/log/apache2/error.log`
 
 ### Tray shows "Server Unreachable"
-- The Pi is not responding to pings from the client — check they are on the same LAN
+- The Pi is not responding to pings from the client - check they are on the same LAN
 - Confirm the VPN Gateway IP in Settings matches the Pi's actual LAN IP
 
 ### Kill switch triggers unexpectedly
@@ -281,15 +281,15 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 ### Versioning Strategy
 - **Major.Minor.Patch.Build** (e.g., `1.0.1.35`)
 - The **Build** number is automatically incremented by `increment_version.py` on every Windows build.
 - **Major/Minor/Patch** are manually controlled in `version_info.txt`.
 
-## 📜 License
+## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 Bundled dependency: [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).

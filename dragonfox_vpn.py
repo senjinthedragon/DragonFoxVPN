@@ -16,7 +16,7 @@ Key Components:
 Supports Linux (native tools) and Windows (PowerShell/Netsh).
 
 Copyright (c) 2026 DragonFox Studios
-MIT License — see LICENSE for details.
+MIT License - see LICENSE for details.
 """
 
 __version__ = "1.0.1.39"
@@ -1054,7 +1054,7 @@ class VPNTrayApp(QApplication):
         self.tray_icon.show()
         self.tray_icon.activated.connect(self.on_tray_activated)
 
-        # First-run setup — must complete before any networking starts
+        # First-run setup - must complete before any networking starts
         if not config_manager.get("setup_complete"):
             if SetupDialog(self.anchor, first_run=True).exec_() != QDialog.Accepted:
                 sys.exit(0)

@@ -7,7 +7,7 @@ ping 5
 ping-restart 30
 ping-timer-rem
 
-# Don't let the server overwrite our routing — we manage it ourselves
+# Don't let the server overwrite our routing - we manage it ourselves
 route-nopull
 pull-filter ignore "redirect-gateway"
 pull-filter ignore "dhcp-option"
@@ -18,7 +18,7 @@ remote-cert-tls server
 # Your provider credentials file (line 1: username, line 2: password)
 # Create it with: sudo nano /etc/openvpn/client/credentials.txt
 # NOTE: if your provider embeds credentials directly in the .ovpn files,
-# comment out this line — otherwise OpenVPN will fail to connect.
+# comment out this line - otherwise OpenVPN will fail to connect.
 auth-user-pass /etc/openvpn/client/credentials.txt
 
 # Run the routing setup script when the tunnel comes up
