@@ -28,7 +28,7 @@ internet, with this tray app managing routing on each client machine.
 
 ## Architecture
 
-```
+```text
 [Client PC]  -->  [Raspberry Pi (OpenVPN gateway)]  -->  [Internet via VPN]
   tray app            backend web UI + switch script
 ```
@@ -153,6 +153,7 @@ sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf
 ```
 
 Open the file and edit two lines to match your setup:
+
 - `ServerName` - the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
 - `Require ip` - your LAN subnet (e.g. `192.168.1.0/24`)
 
@@ -189,7 +190,7 @@ sudo nano /etc/sudoers.d/dragonfoxvpn
 
 Add this line, replacing `yourusername` with your actual username:
 
-```
+```text
 yourusername ALL=(root) NOPASSWD: /sbin/ip, /usr/bin/resolvectl, /sbin/sysctl, /usr/bin/systemd-resolve
 ```
 
@@ -218,9 +219,11 @@ The project includes a fully automated build script:
 
 1. Open PowerShell in the project directory.
 2. Run:
+
     ```powershell
     .\build_windows.ps1
     ```
+
 3. The output executable will be in `dist\DragonFoxVPN Tray.exe`.
 
 The build script auto-increments the build number and embeds version metadata. Requires `app.ico` and `version_info.txt` in the root directory.
@@ -228,12 +231,15 @@ The build script auto-increments the build number and embeds version metadata. R
 ## Running
 
 ### Windows
+
 Run `DragonFoxVPN Tray.exe` as **Administrator** (required to modify the routing table and network settings).
 
 ### Linux
+
 ```bash
 python dragonfox_vpn.py
 ```
+
 (No sudo needed if you followed the sudoers step above.)
 
 ## Configuration
@@ -250,32 +256,38 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 ## Troubleshooting
 
 ### Web UI not accessible
+
 - Confirm Apache is running: `sudo systemctl status apache2`
 - Confirm PHP-FPM is running: `sudo systemctl status php8.2-fpm`
 - Check the vhost `Require ip` line matches your client's subnet
 - Try accessing by IP directly: `http://<pi-ip>/` to rule out DNS issues
 
 ### OpenVPN tunnel not coming up
+
 - Check service status: `sudo systemctl status openvpn-client@active`
 - View logs: `sudo journalctl -u openvpn-client@active -n 50`
 - Verify your credentials file has the correct username on line 1 and password on line 2
 - Confirm at least one `.ovpn` file exists in `EXPRESS_DIR` and run `switch-openvpn.sh --refresh`
 
 ### Location switching does nothing
+
 - Confirm the sudoers entry for `www-data` is in place: `sudo cat /etc/sudoers.d/switch-openvpn`
 - Test the script manually: `sudo /usr/local/bin/switch-openvpn.sh --refresh`
 - Check Apache error log: `sudo tail /var/log/apache2/error.log`
 
 ### Tray shows "Server Unreachable"
+
 - The Pi is not responding to pings from the client - check they are on the same LAN
 - Confirm the VPN Gateway IP in Settings matches the Pi's actual LAN IP
 
 ### Kill switch triggers unexpectedly
+
 - This usually means `traceroute` to `8.8.8.8` isn't seeing the VPN gateway as the first hop
 - Confirm `vpn-route-up.sh` executed successfully by checking OpenVPN logs
 - Verify IP forwarding is still enabled: `sysctl net.ipv4.ip_forward` (should return `1`)
 
 ### Routing not restored after disabling VPN
+
 - The app removes the VPN route but your default route should return automatically
 - If internet is still broken, run: `sudo ip route add default via <your-router-ip>`
 
@@ -284,6 +296,7 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 ## Contributing
 
 ### Versioning Strategy
+
 - **Major.Minor.Patch.Build** (e.g., `1.0.1.35`)
 - The **Build** number is automatically incremented by `increment_version.py` on every Windows build.
 - **Major/Minor/Patch** are manually controlled in `version_info.txt`.
