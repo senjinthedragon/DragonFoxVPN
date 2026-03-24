@@ -33,17 +33,23 @@ internet, with this tray app managing routing on each client machine.
   tray app            backend web UI + switch script
 ```
 
-The tray app modifies the client's routing table to send all traffic through the Pi.
-The Pi runs OpenVPN and a small PHP web UI (`backend/`) that the tray app queries to
-fetch available locations and trigger server switches.
+The tray app modifies the **client machine's** routing table to send all traffic through the Pi.
+The Pi runs OpenVPN and a small PHP web UI (`backend/`) that the tray app queries to fetch
+available locations and trigger server switches. Each client machine runs the tray app
+independently — no router configuration required.
+
+---
 
 ## 🖥️ Backend Setup (Raspberry Pi)
 
 ### Prerequisites
 
-- Raspberry Pi running Debian/Raspberry Pi OS
-- Apache2 + PHP 8.x + php-fpm
-- OpenVPN installed (`sudo apt install openvpn`)
+```bash
+sudo apt install openvpn apache2 php8.2 php8.2-fpm libapache2-mod-fcgid
+sudo a2enmod proxy_fcgi setenvif
+sudo a2enconf php8.2-fpm
+sudo systemctl restart apache2
+```
 
 ### 1. Enable IP forwarding
 
@@ -74,8 +80,8 @@ Edit the variables at the top of the script to match your network:
 
 | Variable | Description |
 |---|---|
-| `LAN_IF` | Pi's LAN-facing interface (e.g. `eth0`) |
-| `LAN_NET` | Your LAN subnet (e.g. `192.168.1.0/24`) |
+| `LAN_IF` | Pi's LAN-facing interface (usually `eth0` — run `ip link` to check) |
+| `LAN_NET` | Your LAN subnet (e.g. `192.168.1.0/24` — check your router's DHCP settings) |
 | `PI_IP` | Pi's own LAN IP — excluded from VPN routing so the Pi keeps a direct connection |
 
 > You never run this script manually. OpenVPN calls it automatically every time the tunnel
@@ -96,6 +102,10 @@ sudo nano /etc/openvpn/client/credentials.txt
 sudo chmod 600 /etc/openvpn/client/credentials.txt
 ```
 
+> **Providers with embedded credentials**: Some providers include credentials directly inside
+> the `.ovpn` files rather than using a separate auth file. If yours does, comment out the
+> `auth-user-pass` line in `common.conf` — otherwise OpenVPN will fail to start.
+
 ### 5. Install and enable the switch script
 
 ```bash
@@ -103,14 +113,14 @@ sudo cp backend/switch-openvpn.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/switch-openvpn.sh
 ```
 
-Edit the configuration variables at the top to match your setup:
+Edit the configuration variables at the top of the script:
 
 | Variable | Description |
 |---|---|
-| `EXPRESS_DIR` | Directory containing your `.ovpn` files |
+| `EXPRESS_DIR` | Directory containing your `.ovpn` files (default: `/etc/openvpn/client/configs`) |
 | `CLIENT_LINK` | Symlink the OpenVPN service reads (default: `/etc/openvpn/client/active.conf`) |
 | `OPENVPN_SERVICE` | systemd service name (default: `openvpn-client@active`) |
-| `CONF_OVERLAY` | Path to `common.conf`, or `""` to disable overlay injection |
+| `CONF_OVERLAY` | Path to `common.conf` — leave as default if you followed step 4 exactly |
 
 Allow the web server to run it as root:
 
@@ -128,7 +138,7 @@ sudo systemctl enable --now openvpn-client@active
 ### 6. Deploy the web UI
 
 ```bash
-sudo cp -r backend/ /var/www/vpn/
+sudo cp -r backend/. /var/www/vpn/
 sudo chown -R www-data:www-data /var/www/vpn/
 ```
 
@@ -140,7 +150,13 @@ Leave it as `""` if your filenames have no prefix.
 
 ```bash
 sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf
-# Edit ServerName and the Require ip subnet to match your LAN
+```
+
+Open the file and edit two lines to match your setup:
+- `ServerName` — the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
+- `Require ip` — your LAN subnet (e.g. `192.168.1.0/24`)
+
+```bash
 sudo a2ensite vpn
 sudo systemctl reload apache2
 ```
@@ -157,21 +173,42 @@ sudo systemctl reload apache2
 ### Dependencies
 
 ```bash
-pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
+pip install PyQt5 requests beautifulsoup4 pycountry
 ```
 
 *On Linux, installing `python-pyqt5` via your package manager is recommended for better system integration.*
 
+### Linux: passwordless sudo for network commands
+
+The tray app uses `ip`, `resolvectl`, and `sysctl` to manage routing. Rather than running the
+whole app as root, grant your user passwordless access to just those commands:
+
+```bash
+sudo nano /etc/sudoers.d/dragonfoxvpn
+```
+
+Add this line, replacing `yourusername` with your actual username:
+
+```
+yourusername ALL=(root) NOPASSWD: /sbin/ip, /usr/bin/resolvectl, /sbin/sysctl, /usr/bin/systemd-resolve
+```
+
+Then run the app normally (no sudo):
+
+```bash
+python dragonfox_vpn.py
+```
+
 ### First Run
 
-On first launch the app will show a setup dialog. Enter:
+On first launch the app shows a setup dialog. Here's what each field means:
 
-| Field | Description |
+| Field | What to enter |
 |---|---|
-| **VPN Gateway IP** | Your Pi's LAN IP address |
-| **ISP Gateway IP** | Your router's LAN IP address |
-| **DNS Server** | Usually the same as the VPN Gateway |
-| **VPN Switcher URL** | URL of the backend web UI on the Pi |
+| **VPN Gateway IP** | Your Pi's LAN IP address (the same IP you SSH into it with) |
+| **ISP Gateway IP** | Your router's LAN IP — usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
+| **DNS Server** | Enter the same IP as your VPN Gateway — the Pi handles DNS when connected |
+| **VPN Switcher URL** | `http://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20` |
 
 Settings are saved to the config file and can be changed later via **⚙️ Settings...** in the tray menu.
 
@@ -195,9 +232,9 @@ Run `DragonFoxVPN Tray.exe` as **Administrator** (required to modify the routing
 
 ### Linux
 ```bash
-sudo python dragonfox_vpn.py
+python dragonfox_vpn.py
 ```
-Root is required for `ip` and `resolvectl` commands.
+(No sudo needed if you followed the sudoers step above.)
 
 ## ⚙️ Configuration
 
@@ -207,6 +244,42 @@ The application stores its configuration in:
 - **Linux**: `~/.config/dragonfox_vpn.json`
 
 Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
+
+---
+
+## 🔧 Troubleshooting
+
+### Web UI not accessible
+- Confirm Apache is running: `sudo systemctl status apache2`
+- Confirm PHP-FPM is running: `sudo systemctl status php8.2-fpm`
+- Check the vhost `Require ip` line matches your client's subnet
+- Try accessing by IP directly: `http://<pi-ip>/` to rule out DNS issues
+
+### OpenVPN tunnel not coming up
+- Check service status: `sudo systemctl status openvpn-client@active`
+- View logs: `sudo journalctl -u openvpn-client@active -n 50`
+- Verify your credentials file has the correct username on line 1 and password on line 2
+- Confirm at least one `.ovpn` file exists in `EXPRESS_DIR` and run `switch-openvpn.sh --refresh`
+
+### Location switching does nothing
+- Confirm the sudoers entry for `www-data` is in place: `sudo cat /etc/sudoers.d/switch-openvpn`
+- Test the script manually: `sudo /usr/local/bin/switch-openvpn.sh --refresh`
+- Check Apache error log: `sudo tail /var/log/apache2/vpn.hatchling.org.error.log`
+
+### Tray shows "Server Unreachable"
+- The Pi is not responding to pings from the client — check they are on the same LAN
+- Confirm the VPN Gateway IP in Settings matches the Pi's actual LAN IP
+
+### Kill switch triggers unexpectedly
+- This usually means `traceroute` to `8.8.8.8` isn't seeing the VPN gateway as the first hop
+- Confirm `vpn-route-up.sh` executed successfully by checking OpenVPN logs
+- Verify IP forwarding is still enabled: `sysctl net.ipv4.ip_forward` (should return `1`)
+
+### Routing not restored after disabling VPN
+- The app removes the VPN route but your default route should return automatically
+- If internet is still broken, run: `sudo ip route add default via <your-router-ip>`
+
+---
 
 ## 🤝 Contributing
 
