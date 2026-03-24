@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
+# dragonfox_vpn.py
 """
-DragonFox VPN Tray Application
-==============================
+dragonfox_vpn.py - DragonFoxVPN: System tray application
+Copyright (c) 2026 DragonFox Studios.
+https://github.com/senjinthedragon/DragonFoxVPN
+Licensed under the MIT License.
+See LICENSE for full license information.
 
-A professional-grade system tray utility for managing VPN connections.
-Features a modern dark UI, location switching, auto-connect capabilities,
-and robust background network state management.
+System tray utility for managing VPN connections through a Raspberry Pi
+OpenVPN gateway. Features a dark UI, location switching with flags,
+auto-connect, kill switch, and DNS leak protection.
 
-Key Components:
+Key components:
 - SystemHandler: OS-level routing and network commands.
-- VPNApi: Interacts with the backend to fetch nodes.
+- VPNApi: Interacts with the backend to fetch locations.
 - VPNTrayApp: Main Qt application controller.
 - AutoStartManager: Windows Registry management for startup.
 
 Supports Linux (native tools) and Windows (PowerShell/Netsh).
-
-Copyright (c) 2026 DragonFox Studios
-MIT License - see LICENSE for details.
 """
 
 __version__ = "1.0.1.39"

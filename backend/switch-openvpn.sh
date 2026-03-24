@@ -1,21 +1,21 @@
 #!/bin/bash
-# switch-openvpn.sh
-# Switches the active OpenVPN client config by updating a symlink and restarting the service.
+# switch-openvpn.sh - DragonFoxVPN: Switch active OpenVPN config
+# Copyright (c) 2026 DragonFox Studios.
+# https://github.com/senjinthedragon/DragonFoxVPN
+# Licensed under the MIT License.
+# See LICENSE for full license information.
+#
+# Switches the active OpenVPN client config by updating a symlink and
+# restarting the systemd service. On first switch, patches the .ovpn file
+# to inject the shared common.conf overlay and disable server-side routing
+# directives (managed by the tray app instead).
 #
 # Usage:
-#   switch-openvpn.sh <config-basename>   -- switch to a specific config
-#   switch-openvpn.sh --refresh           -- rebuild locations.txt from disk
+#   switch-openvpn.sh <config-basename>   - switch to a specific config
+#   switch-openvpn.sh --refresh           - rebuild locations.txt from disk
 #
 # Must be run as root (via sudo from the web UI).
-#
-# Setup:
-#   1. Place your .ovpn files in EXPRESS_DIR.
-#   2. Ensure OPENVPN_SERVICE matches your systemd unit name.
-#   3. Set CONF_OVERLAY to your shared credentials/options file, or leave empty ("").
-#   4. Copy to /usr/local/bin/ and chmod +x.
-#   5. Allow the web server to run it as root without a password:
-#        echo "www-data ALL=(root) NOPASSWD: /usr/local/bin/switch-openvpn.sh" \
-#          | sudo tee /etc/sudoers.d/switch-openvpn
+# See README for sudoers setup.
 
 set -euo pipefail
 

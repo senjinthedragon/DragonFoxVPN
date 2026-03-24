@@ -1,16 +1,17 @@
 #!/bin/bash
-# vpn-route-up.sh
-# Called by OpenVPN via the "up" directive when the tunnel comes up.
-# Sets up policy routing so LAN clients are routed through the VPN tunnel
-# while the Pi itself continues to use the direct internet connection.
+# vpn-route-up.sh - DragonFoxVPN: OpenVPN tunnel-up routing hook
+# Copyright (c) 2026 DragonFox Studios.
+# https://github.com/senjinthedragon/DragonFoxVPN
+# Licensed under the MIT License.
+# See LICENSE for full license information.
+#
+# Called automatically by OpenVPN via the "up" directive in common.conf
+# each time the tunnel comes up. Sets up policy routing so LAN clients
+# are routed through the VPN tunnel while the Pi itself continues to use
+# the direct internet connection.
 #
 # OpenVPN passes the tunnel device name as $1.
-#
-# Setup:
-#   1. Adjust the variables below to match your network.
-#   2. Place at /etc/openvpn/client/vpn-route-up.sh
-#   3. chmod +x /etc/openvpn/client/vpn-route-up.sh
-#   4. Reference it from common.conf:  up /etc/openvpn/client/vpn-route-up.sh
+# Configuration is read from /etc/dragonfoxvpn/config.conf.
 
 TUN_DEV="$1"
 

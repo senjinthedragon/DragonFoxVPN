@@ -1,3 +1,15 @@
+# increment_version.py
+"""
+increment_version.py - DragonFoxVPN: Build number increment helper
+Copyright (c) 2026 DragonFox Studios.
+https://github.com/senjinthedragon/DragonFoxVPN
+Licensed under the MIT License.
+See LICENSE for full license information.
+
+Increments the fourth version component (build number) in version_info.txt
+and syncs the new version string into dragonfox_vpn.py. Called automatically
+by build_windows.ps1 before each PyInstaller build.
+"""
 
 import re
 import sys

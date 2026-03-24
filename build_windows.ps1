@@ -1,15 +1,13 @@
 <#
-.SYNOPSIS
-    Automated Build Script for DragonFoxVPN Tray
-.DESCRIPTION
-    This script handles the complete build lifecycle:
-    1. Increments the application version number via Python script.
-    2. Invokes PyInstaller to compile a standalone executable.
-    3. Excludes unnecessary standard libraries to optimize size.
-    4. Embeds version information and icon resources.
-.NOTES
-    Author: DragonFox Studios
-    Date: 2026-01-25
+build_windows.ps1 - DragonFoxVPN: Windows build script
+Copyright (c) 2026 DragonFox Studios.
+https://github.com/senjinthedragon/DragonFoxVPN
+Licensed under the MIT License.
+See LICENSE for full license information.
+
+Automates the full Windows build lifecycle: increments the build number
+via increment_version.py, then runs PyInstaller to produce a single
+standalone executable with version metadata and icon embedded.
 #>
 # Prerequisites: pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
 

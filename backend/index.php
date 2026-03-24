@@ -1,4 +1,16 @@
 <?php
+/**
+ * index.php - DragonFoxVPN: Backend web UI
+ * Copyright (c) 2026 DragonFox Studios.
+ * https://github.com/senjinthedragon/DragonFoxVPN
+ * Licensed under the MIT License.
+ * See LICENSE for full license information.
+ *
+ * PHP web UI served by the Raspberry Pi gateway. Displays available VPN
+ * locations grouped by continent with flag icons, and triggers location
+ * switches by calling switch-openvpn.sh via sudo.
+ */
+
 // Load configuration from the shared config file
 $_cfg        = @parse_ini_file('/etc/dragonfoxvpn/config.conf') ?: [];
 $CONF_PREFIX = $_cfg['CONF_PREFIX'] ?? '';
