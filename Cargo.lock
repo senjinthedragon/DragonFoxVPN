@@ -725,6 +725,7 @@ dependencies = [
  "eframe",
  "egui",
  "env_logger",
+ "gtk",
  "image 0.24.9",
  "log",
  "native-tls",

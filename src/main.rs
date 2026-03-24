@@ -14,6 +14,18 @@ fn main() {
         .format_timestamp_secs()
         .init();
 
+    #[cfg(target_os = "linux")]
+    {
+        // tray-icon uses GTK-backed menus on Linux and panics if GTK isn't initialized first.
+        // Windows uses the Win32 event loop and does not require GTK initialization.
+        if !gtk::is_initialized_main_thread() {
+            gtk::init().unwrap_or_else(|e| {
+                eprintln!("Failed to initialize GTK: {e}");
+                std::process::exit(1);
+            });
+        }
+    }
+
     if !dragonfox_vpn::single_instance_check() {
         log::warn!("Another instance of DragonFoxVPN is already running. Exiting.");
         return;

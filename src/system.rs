@@ -39,6 +39,14 @@ pub fn run_command(cmd: &str) -> (String, String, i32) {
 pub struct SystemHandler;
 
 impl SystemHandler {
+    fn is_safe_adapter(adapter: &str) -> bool {
+        regex_lite(r"^[a-zA-Z0-9._:-]+$").is_match(adapter)
+    }
+
+    fn is_safe_host(host: &str) -> bool {
+        regex_lite(r"^[a-zA-Z0-9._:-]+$").is_match(host)
+    }
+
     /// Detect the active network adapter name.
     pub fn get_active_adapter() -> String {
         let safe_re = regex_lite(r"^[a-zA-Z0-9._:-]+$");
@@ -87,6 +95,11 @@ impl SystemHandler {
     /// Configure system routing to use the VPN gateway.
     /// Returns true on success.
     pub fn enable_routing(adapter: &str, vpn_gw: &str, vpn_dns: &str) -> bool {
+        if !Self::is_safe_adapter(adapter) || !is_valid_ipv4(vpn_gw) || !is_valid_ipv4(vpn_dns) {
+            error!("Refusing to run routing command with unsafe parameters.");
+            return false;
+        }
+
         if std::env::consts::OS == "windows" {
             run_command("route delete 0.0.0.0 mask 0.0.0.0");
             let (_, _, code) =
@@ -110,6 +123,11 @@ impl SystemHandler {
 
     /// Restore default system routing, removing the VPN route.
     pub fn disable_routing(adapter: &str, vpn_gw: &str) {
+        if !Self::is_safe_adapter(adapter) || !is_valid_ipv4(vpn_gw) {
+            error!("Refusing to run routing command with unsafe parameters.");
+            return;
+        }
+
         if std::env::consts::OS == "windows" {
             run_command(&format!("route delete 0.0.0.0 mask 0.0.0.0 {vpn_gw}"));
             run_command(&format!(
@@ -128,6 +146,11 @@ impl SystemHandler {
 
     /// Kill-switch route deletion: forcibly remove the VPN default route.
     pub fn kill_switch_delete_route(vpn_gw: &str, adapter: &str) {
+        if !Self::is_safe_adapter(adapter) || !is_valid_ipv4(vpn_gw) {
+            error!("Refusing to run kill-switch command with unsafe parameters.");
+            return;
+        }
+
         if std::env::consts::OS == "windows" {
             run_command(&format!("route delete 0.0.0.0 mask 0.0.0.0 {vpn_gw}"));
         } else {
@@ -140,6 +163,11 @@ impl SystemHandler {
     /// Check if the first traceroute hop is NOT the ISP gateway
     /// (indicating traffic is flowing through the VPN).
     pub fn check_connection(vpn_gw: &str, isp_gw: &str) -> bool {
+        if !is_valid_ipv4(isp_gw) {
+            error!("Invalid ISP gateway configured; cannot verify VPN route.");
+            return false;
+        }
+
         let _ = vpn_gw; // vpn_gw not needed directly but kept for API symmetry
         let (stdout, _, code) = if std::env::consts::OS == "windows" {
             run_command("tracert -d -h 1 8.8.8.8")
@@ -161,6 +189,11 @@ impl SystemHandler {
 
     /// Ping a single host; returns true if it responds.
     pub fn ping_host(host: &str) -> bool {
+        if !Self::is_safe_host(host) {
+            error!("Refusing to ping unsafe host value.");
+            return false;
+        }
+
         let cmd = if std::env::consts::OS == "windows" {
             format!("ping -n 1 -w 1000 {host}")
         } else {
@@ -172,6 +205,11 @@ impl SystemHandler {
 
     /// Check if the VPN default route is present in the routing table.
     pub fn is_route_active(vpn_gw: &str, adapter: &str) -> bool {
+        if !Self::is_safe_adapter(adapter) || !is_valid_ipv4(vpn_gw) {
+            error!("Refusing to query route with unsafe parameters.");
+            return false;
+        }
+
         if std::env::consts::OS == "windows" {
             let (stdout, _, code) = run_command("route print");
             code == 0 && stdout.contains(vpn_gw)
