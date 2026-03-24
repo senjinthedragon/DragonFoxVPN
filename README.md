@@ -43,36 +43,71 @@ fetch available locations and trigger server switches.
 
 - Raspberry Pi running Debian/Raspberry Pi OS
 - Apache2 + PHP 8.x + php-fpm
-- OpenVPN with `.ovpn` config files from your provider
+- OpenVPN installed (`sudo apt install openvpn`)
 
-### 1. Place your `.ovpn` files
+### 1. Enable IP forwarding
 
-Download your provider's `.ovpn` config files and place them in `/etc/openvpn/client/configs/`.
+```bash
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### 2. Place your `.ovpn` files
 
 ```bash
 sudo mkdir -p /etc/openvpn/client/configs
 sudo cp *.ovpn /etc/openvpn/client/configs/
 ```
 
-> **ExpressVPN users**: Log into your ExpressVPN account → Downloads → Manual Config → OpenVPN.
+> **ExpressVPN users**: Log into your account → Downloads → Manual Config → OpenVPN.
 > Download the configs for the locations you want and copy them to the Pi.
 > Each user must download their own — the files contain account-specific credentials.
 
-### 2. Install the switch script
+### 3. Set up the routing script
+
+```bash
+sudo cp backend/vpn-route-up.sh /etc/openvpn/client/
+sudo chmod +x /etc/openvpn/client/vpn-route-up.sh
+```
+
+Edit the variables at the top of the script to match your network:
+
+| Variable | Description |
+|---|---|
+| `LAN_IF` | Pi's LAN-facing interface (e.g. `eth0`) |
+| `LAN_NET` | Your LAN subnet (e.g. `192.168.1.0/24`) |
+| `PI_IP` | Pi's own LAN IP — excluded from VPN routing so the Pi keeps a direct connection |
+
+### 4. Set up the shared OpenVPN config
+
+```bash
+sudo cp backend/common.conf.example /etc/openvpn/client/common.conf
+```
+
+Create a credentials file with your VPN provider username and password:
+
+```bash
+sudo nano /etc/openvpn/client/credentials.txt
+# Line 1: your username
+# Line 2: your password
+sudo chmod 600 /etc/openvpn/client/credentials.txt
+```
+
+### 5. Install and enable the switch script
 
 ```bash
 sudo cp backend/switch-openvpn.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/switch-openvpn.sh
 ```
 
-Edit the configuration variables at the top of the script:
+Edit the configuration variables at the top to match your setup:
 
 | Variable | Description |
 |---|---|
 | `EXPRESS_DIR` | Directory containing your `.ovpn` files |
-| `CLIENT_LINK` | Symlink path the OpenVPN service follows |
-| `OPENVPN_SERVICE` | Your systemd service name (e.g. `openvpn-client@active`) |
-| `CONF_OVERLAY` | Path to a shared credentials/options file, or `""` to disable |
+| `CLIENT_LINK` | Symlink the OpenVPN service reads (default: `/etc/openvpn/client/active.conf`) |
+| `OPENVPN_SERVICE` | systemd service name (default: `openvpn-client@active`) |
+| `CONF_OVERLAY` | Path to `common.conf`, or `""` to disable overlay injection |
 
 Allow the web server to run it as root:
 
@@ -81,7 +116,13 @@ echo "www-data ALL=(root) NOPASSWD: /usr/local/bin/switch-openvpn.sh" \
   | sudo tee /etc/sudoers.d/switch-openvpn
 ```
 
-### 3. Deploy the web UI
+Enable the OpenVPN service:
+
+```bash
+sudo systemctl enable --now openvpn-client@active
+```
+
+### 6. Deploy the web UI
 
 ```bash
 sudo cp -r backend/ /var/www/vpn/
@@ -90,10 +131,9 @@ sudo chown -R www-data:www-data /var/www/vpn/
 
 Edit `$CONF_PREFIX` at the top of `/var/www/vpn/index.php` to match your provider's filename prefix.
 For example, ExpressVPN files are named `my_expressvpn_france_udp.ovpn`, so the prefix is `my_expressvpn_`.
+Leave it as `""` if your filenames have no prefix.
 
-### 4. Configure Apache
-
-Copy and customise the example vhost:
+### 7. Configure Apache
 
 ```bash
 sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf

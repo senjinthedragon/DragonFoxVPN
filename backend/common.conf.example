@@ -1,0 +1,38 @@
+# common.conf
+# Shared OpenVPN options included by every .ovpn config via the overlay mechanism.
+# Copy to /etc/openvpn/client/common.conf and fill in your credentials path.
+
+# Keep the tunnel alive
+ping 5
+ping-restart 30
+ping-timer-rem
+
+# Don't let the server overwrite our routing — we manage it ourselves
+route-nopull
+pull-filter ignore "redirect-gateway"
+pull-filter ignore "dhcp-option"
+
+# TLS hardening
+remote-cert-tls server
+
+# Your provider credentials file (one line: username, next line: password)
+# Create it with: sudo nano /etc/openvpn/client/credentials.txt
+auth-user-pass /etc/openvpn/client/credentials.txt
+
+# Run the routing setup script when the tunnel comes up
+script-security 2
+up /etc/openvpn/client/vpn-route-up.sh
+
+# Logging
+verb 3
+mute 20
+
+# Performance
+sndbuf 1048576
+rcvbuf 1048576
+fast-io
+mssfix 1200
+
+# Keep tunnel and keys alive across restarts
+persist-key
+persist-tun
