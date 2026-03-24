@@ -19,7 +19,7 @@ VSVersionInfo(
         StringStruct(u'FileDescription', u'VPN Management Tray for the DragonFoxVPN network service.'),
         StringStruct(u'FileVersion', u'1.1.0.0'),
         StringStruct(u'InternalName', u'DragonFoxVPN Tray'),
-        StringStruct(u'LegalCopyright', u'(c)2026 DragonFox Studios'),
+        StringStruct(u'LegalCopyright', u'(c)2026 Senjin the Dragon'),
         StringStruct(u'OriginalFilename', u'DragonFoxVPN Tray.exe'),
         StringStruct(u'ProductName', u'DragonFoxVPN'),
         StringStruct(u'ProductVersion', u'1.1.0.0')])

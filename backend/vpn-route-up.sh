@@ -1,6 +1,6 @@
 #!/bin/bash
 # vpn-route-up.sh - DragonFoxVPN: OpenVPN tunnel-up routing hook
-# Copyright (c) 2026 DragonFox Studios.
+# Copyright (c) 2026 Senjin the Dragon.
 # https://github.com/senjinthedragon/DragonFoxVPN
 # Licensed under the MIT License.
 # See LICENSE for full license information.

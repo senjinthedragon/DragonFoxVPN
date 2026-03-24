@@ -1,6 +1,6 @@
 #!/bin/bash
 # switch-openvpn.sh - DragonFoxVPN: Switch active OpenVPN config
-# Copyright (c) 2026 DragonFox Studios.
+# Copyright (c) 2026 Senjin the Dragon.
 # https://github.com/senjinthedragon/DragonFoxVPN
 # Licensed under the MIT License.
 # See LICENSE for full license information.

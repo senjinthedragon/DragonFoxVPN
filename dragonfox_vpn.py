@@ -2,7 +2,7 @@
 # dragonfox_vpn.py
 """
 dragonfox_vpn.py - DragonFoxVPN: System tray application
-Copyright (c) 2026 DragonFox Studios.
+Copyright (c) 2026 Senjin the Dragon.
 https://github.com/senjinthedragon/DragonFoxVPN
 Licensed under the MIT License.
 See LICENSE for full license information.

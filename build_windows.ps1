@@ -1,6 +1,6 @@
 <#
 build_windows.ps1 - DragonFoxVPN: Windows build script
-Copyright (c) 2026 DragonFox Studios.
+Copyright (c) 2026 Senjin the Dragon.
 https://github.com/senjinthedragon/DragonFoxVPN
 Licensed under the MIT License.
 See LICENSE for full license information.
