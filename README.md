@@ -20,7 +20,7 @@ Designed to work seamlessly on **Windows 10/11** and **Linux (Garuda/Arch/Debian
     - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
 - **📊 Real-time Monitoring**:
     - Dashboard showing connection status, gateway IP, and session duration.
-    - Tray icon changes color based on status (🟢 Connected, 🟡 Disabled, 🔴 Dropped).
+    - Tray icon changes color based on status (🟢 Connected, 🟡 Disabled, 🔴 Dropped, ⚫ Server Unreachable).
 
 ## 🛠️ Installation & Building
 
