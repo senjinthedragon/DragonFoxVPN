@@ -51,14 +51,35 @@ sudo a2enconf php8.2-fpm
 sudo systemctl restart apache2
 ```
 
-### 1. Enable IP forwarding
+### 1. Create your config file
+
+All backend configuration lives in one place. Copy the example and edit it:
+
+```bash
+sudo mkdir -p /etc/dragonfoxvpn
+sudo cp backend/dragonfox.conf.example /etc/dragonfoxvpn/config.conf
+sudo nano /etc/dragonfoxvpn/config.conf
+```
+
+The file is well-commented. The values you'll need to change are:
+
+| Setting | How to find it |
+|---|---|
+| `LAN_IF` | Run `ip link` — it's the interface with your LAN IP (usually `eth0`) |
+| `LAN_NET` | Your router's subnet, e.g. `192.168.1.0/24` — check your router's DHCP settings |
+| `PI_IP` | The Pi's own LAN IP address |
+| `CONF_PREFIX` | The common prefix of your `.ovpn` filenames, e.g. `my_expressvpn_` |
+
+Everything else can be left as the default unless you have a specific reason to change it.
+
+### 2. Enable IP forwarding
 
 ```bash
 echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
 sudo sysctl -p
 ```
 
-### 2. Place your `.ovpn` files
+### 3. Place your `.ovpn` files
 
 ```bash
 sudo mkdir -p /etc/openvpn/client/configs
@@ -69,25 +90,17 @@ sudo cp *.ovpn /etc/openvpn/client/configs/
 > Download the configs for the locations you want and copy them to the Pi.
 > Each user must download their own — the files contain account-specific credentials.
 
-### 3. Set up the routing script
+### 4. Set up the routing script
 
 ```bash
 sudo cp backend/vpn-route-up.sh /etc/openvpn/client/
 sudo chmod +x /etc/openvpn/client/vpn-route-up.sh
 ```
 
-Edit the variables at the top of the script to match your network:
-
-| Variable | Description |
-|---|---|
-| `LAN_IF` | Pi's LAN-facing interface (usually `eth0` — run `ip link` to check) |
-| `LAN_NET` | Your LAN subnet (e.g. `192.168.1.0/24` — check your router's DHCP settings) |
-| `PI_IP` | Pi's own LAN IP — excluded from VPN routing so the Pi keeps a direct connection |
-
 > You never run this script manually. OpenVPN calls it automatically every time the tunnel
-> comes up, via the `up` directive in `common.conf`.
+> comes up, via the `up` directive in `common.conf`. It reads its settings from your config file.
 
-### 4. Set up the shared OpenVPN config
+### 5. Set up the shared OpenVPN config
 
 ```bash
 sudo cp backend/common.conf.example /etc/openvpn/client/common.conf
@@ -106,21 +119,12 @@ sudo chmod 600 /etc/openvpn/client/credentials.txt
 > the `.ovpn` files rather than using a separate auth file. If yours does, comment out the
 > `auth-user-pass` line in `common.conf` — otherwise OpenVPN will fail to start.
 
-### 5. Install and enable the switch script
+### 6. Install and enable the switch script
 
 ```bash
 sudo cp backend/switch-openvpn.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/switch-openvpn.sh
 ```
-
-Edit the configuration variables at the top of the script:
-
-| Variable | Description |
-|---|---|
-| `EXPRESS_DIR` | Directory containing your `.ovpn` files (default: `/etc/openvpn/client/configs`) |
-| `CLIENT_LINK` | Symlink the OpenVPN service reads (default: `/etc/openvpn/client/active.conf`) |
-| `OPENVPN_SERVICE` | systemd service name (default: `openvpn-client@active`) |
-| `CONF_OVERLAY` | Path to `common.conf` — leave as default if you followed step 4 exactly |
 
 Allow the web server to run it as root:
 
@@ -135,18 +139,14 @@ Enable the OpenVPN service:
 sudo systemctl enable --now openvpn-client@active
 ```
 
-### 6. Deploy the web UI
+### 7. Deploy the web UI
 
 ```bash
 sudo cp -r backend/. /var/www/vpn/
 sudo chown -R www-data:www-data /var/www/vpn/
 ```
 
-Edit `$CONF_PREFIX` at the top of `/var/www/vpn/index.php` to match your provider's filename prefix.
-For example, ExpressVPN files are named `my_expressvpn_france_udp.ovpn`, so the prefix is `my_expressvpn_`.
-Leave it as `""` if your filenames have no prefix.
-
-### 7. Configure Apache
+### 8. Configure Apache
 
 ```bash
 sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf

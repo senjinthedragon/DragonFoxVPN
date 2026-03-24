@@ -1,0 +1,46 @@
+# DragonFoxVPN Backend Configuration
+# Copy to /etc/dragonfoxvpn/config.conf and edit to match your setup.
+#
+# This file is read by:
+#   - switch-openvpn.sh  (location switching)
+#   - vpn-route-up.sh    (tunnel routing setup)
+#   - index.php          (web UI)
+
+# ---------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------
+
+# Pi's LAN-facing interface (run: ip link)
+LAN_IF="eth0"
+
+# Your LAN subnet
+LAN_NET="192.168.1.0/24"
+
+# Pi's own LAN IP address
+PI_IP="192.168.1.2"
+
+# ---------------------------------------------------------------
+# OpenVPN
+# ---------------------------------------------------------------
+
+# Directory containing your .ovpn config files
+EXPRESS_DIR="/etc/openvpn/client/configs"
+
+# Symlink that the OpenVPN systemd service reads
+CLIENT_LINK="/etc/openvpn/client/active.conf"
+
+# systemd service name (openvpn-client@NAME reads /etc/openvpn/client/NAME.conf)
+OPENVPN_SERVICE="openvpn-client@active"
+
+# Shared config injected into each .ovpn file on first switch.
+# Set to "" to disable overlay injection.
+CONF_OVERLAY="config /etc/openvpn/client/common.conf"
+
+# ---------------------------------------------------------------
+# Web UI
+# ---------------------------------------------------------------
+
+# Prefix to strip from .ovpn filenames for display.
+# e.g. "my_expressvpn_france_udp.ovpn" -> set to "my_expressvpn_"
+# Leave empty ("") if your filenames have no prefix.
+CONF_PREFIX="my_expressvpn_"

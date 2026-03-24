@@ -12,14 +12,18 @@
 #   3. chmod +x /etc/openvpn/client/vpn-route-up.sh
 #   4. Reference it from common.conf:  up /etc/openvpn/client/vpn-route-up.sh
 
-# --- Configuration ---
-LAN_IF="eth0"           # Pi's LAN-facing interface
-LAN_NET="10.0.0.0/24"  # Your LAN subnet
-PI_IP="10.0.0.20"      # Pi's own LAN IP address (excluded from VPN routing)
-ROUTE_TABLE_NAME="vpn"
-ROUTE_TABLE_ID=100
-
 TUN_DEV="$1"
+
+# --- Load configuration ---
+CONFIG_FILE="/etc/dragonfoxvpn/config.conf"
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
+
+# --- Defaults (used if config file is missing) ---
+LAN_IF="${LAN_IF:-eth0}"
+LAN_NET="${LAN_NET:-192.168.1.0/24}"
+PI_IP="${PI_IP:-192.168.1.2}"
+ROUTE_TABLE_NAME="${ROUTE_TABLE_NAME:-vpn}"
+ROUTE_TABLE_ID="${ROUTE_TABLE_ID:-100}"
 
 # --- 1. Enable IP forwarding ---
 sysctl -w net.ipv4.ip_forward=1 >/dev/null

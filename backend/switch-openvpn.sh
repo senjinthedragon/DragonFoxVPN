@@ -19,15 +19,17 @@
 
 set -euo pipefail
 
-# --- Configuration ---
-EXPRESS_DIR="/etc/openvpn/client/configs"     # Directory containing your .ovpn files
-CLIENT_LINK="/etc/openvpn/client/active.conf" # Symlink that the OpenVPN service reads
-LOCATIONS_FILE="/etc/openvpn/locations.txt"   # Cached list of available config names
-OPENVPN_SERVICE="openvpn-client@active"       # systemd service to restart on switch
+# --- Load configuration ---
+CONFIG_FILE="/etc/dragonfoxvpn/config.conf"
+[[ -f "$CONFIG_FILE" ]] && source "$CONFIG_FILE"
 
-# Shared overlay config injected into each .ovpn (credentials, ciphers, etc.)
-# Set to "" to disable overlay injection entirely.
-CONF_OVERLAY="config /etc/openvpn/client/common.conf"
+# --- Defaults (used if config file is missing) ---
+EXPRESS_DIR="${EXPRESS_DIR:-/etc/openvpn/client/configs}"
+CLIENT_LINK="${CLIENT_LINK:-/etc/openvpn/client/active.conf}"
+OPENVPN_SERVICE="${OPENVPN_SERVICE:-openvpn-client@active}"
+CONF_OVERLAY="${CONF_OVERLAY:-config /etc/openvpn/client/common.conf}"
+
+LOCATIONS_FILE="/etc/openvpn/locations.txt"
 
 TARGET="${1:-}"
 

@@ -1,9 +1,7 @@
 <?php
-// --- Configuration ---
-// Set this to the common prefix of your .ovpn filenames so it is stripped from display names.
-// Example: files named "my_expressvpn_france_udp.ovpn" → set to "my_expressvpn_"
-// Leave as "" if your filenames have no prefix (e.g. "france_udp.ovpn").
-$CONF_PREFIX = "my_expressvpn_";
+// Load configuration from the shared config file
+$_cfg        = @parse_ini_file('/etc/dragonfoxvpn/config.conf') ?: [];
+$CONF_PREFIX = $_cfg['CONF_PREFIX'] ?? '';
 
 $locationsFile = "/etc/openvpn/locations.txt";
 $wrapperScript = "/usr/local/bin/switch-openvpn.sh";
