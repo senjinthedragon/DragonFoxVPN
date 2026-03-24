@@ -79,9 +79,6 @@ sudo cp -r backend/ /var/www/vpn/
 sudo chown -R www-data:www-data /var/www/vpn/
 ```
 
-Download the [flag-icons](https://github.com/lipis/flag-icons) library and place it at
-`/var/www/vpn/flag-icons/`.
-
 Edit `$CONF_PREFIX` at the top of `/var/www/vpn/index.php` to match your provider's filename prefix.
 For example, ExpressVPN files are named `my_expressvpn_france_udp.ovpn`, so the prefix is `my_expressvpn_`.
 
