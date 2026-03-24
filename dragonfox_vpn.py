@@ -201,6 +201,7 @@ class AppState:
     icon_connected: Optional[QIcon] = None
     icon_disabled: Optional[QIcon] = None
     icon_dropped: Optional[QIcon] = None
+    icon_unreachable: Optional[QIcon] = None
     icon_info: Optional[QIcon] = None
 
 # --- System Operations ---
@@ -230,6 +231,7 @@ class SystemHandler:
     @staticmethod
     def get_active_adapter() -> str:
         """Detects the active network adapter name."""
+        safe_name = re.compile(r'^[a-zA-Z0-9._:-]+$')
         if platform.system() == "Windows":
             stdout, _, code = SystemHandler.run_command("netsh interface ipv4 show interfaces")
             if code == 0:
@@ -239,14 +241,18 @@ class SystemHandler:
                     if "connected" in line.lower() and "loopback" not in line.lower():
                         parts = line.split()
                         # Usually last column is the name
-                        return parts[-1]
+                        candidate = parts[-1]
+                        if safe_name.match(candidate):
+                            return candidate
             return "Ethernet" # Fallback
         else:
             stdout, _, code = SystemHandler.run_command("ip route show default")
             if code == 0 and stdout:
                 match = re.search(r'dev (\S+)', stdout)
                 if match:
-                    return match.group(1)
+                    candidate = match.group(1)
+                    if safe_name.match(candidate):
+                        return candidate
             return "eno1" # Fallback
 
     @staticmethod
@@ -306,6 +312,16 @@ class SystemHandler:
         return False
 
     @staticmethod
+    def ping_host(host: str) -> bool:
+        """Returns True if the host responds to a single ping."""
+        if platform.system() == "Windows":
+            cmd = f"ping -n 1 -w 1000 {host}"
+        else:
+            cmd = f"ping -c 1 -W 1 {host}"
+        _, _, code = SystemHandler.run_command(cmd, check=False)
+        return code == 0
+
+    @staticmethod
     def is_route_active(vpn_gw: str, adapter: str) -> bool:
         """Checks if the VPN route exists in the routing table."""
         if platform.system() == "Windows":
@@ -322,7 +338,8 @@ def create_status_icon(color_name: str) -> QIcon:
         "green": (QColor("#4CAF50"), QColor("#2E7D32")),
         "yellow": (QColor("#FFC107"), QColor("#FFA000")),
         "red": (QColor("#F44336"), QColor("#D32F2F")),
-        "blue": (QColor("#2196F3"), QColor("#1976D2"))
+        "blue": (QColor("#2196F3"), QColor("#1976D2")),
+        "gray": (QColor("#9E9E9E"), QColor("#616161"))
     }
     
     main_color, border_color = colors.get(color_name, colors["yellow"])
@@ -643,11 +660,12 @@ class LocationFetcherThread(QThread):
 
 class NetworkMonitorThread(QThread):
     """Worker thread for network status monitoring."""
-    status_checked = pyqtSignal(bool, bool)
+    status_checked = pyqtSignal(bool, bool, bool)
     def run(self):
-        vpn_active = SystemHandler.check_connection(Config.VPN_GATEWAY, Config.ISP_GATEWAY)
         route_exists = SystemHandler.is_route_active(Config.VPN_GATEWAY, AppState.adapter_name)
-        self.status_checked.emit(vpn_active, route_exists)
+        vpn_active = SystemHandler.check_connection(Config.VPN_GATEWAY, Config.ISP_GATEWAY) if route_exists else False
+        pi_reachable = SystemHandler.ping_host(Config.VPN_GATEWAY)
+        self.status_checked.emit(vpn_active, route_exists, pi_reachable)
 
 class LocationSwitchThread(QThread):
     """Worker thread for location switching operations."""
@@ -911,6 +929,7 @@ class StatusDashboard(QDialog):
     def get_color(self):
         if AppState.vpn_state == "Connected": return "#4CAF50"
         if AppState.vpn_state == "Dropped": return "#F44336"
+        if AppState.vpn_state == "Server Unreachable": return "#9E9E9E"
         return "#FFC107"
 
     def update_stats(self):
@@ -941,6 +960,7 @@ class VPNTrayApp(QApplication):
         AppState.icon_connected = create_status_icon("green")
         AppState.icon_disabled = create_status_icon("yellow")
         AppState.icon_dropped = create_status_icon("red")
+        AppState.icon_unreachable = create_status_icon("gray")
         AppState.icon_info = create_status_icon("blue")
         
         # Tray setup
@@ -958,6 +978,7 @@ class VPNTrayApp(QApplication):
         
         self.monitor_thread = NetworkMonitorThread()
         self.monitor_thread.status_checked.connect(self.on_network_status_checked)
+        self._drop_count = 0
 
     def setup_menu(self):
         self.menu = QMenu()
@@ -1038,6 +1059,7 @@ class VPNTrayApp(QApplication):
         
         if AppState.vpn_state == "Connected": icon = AppState.icon_connected
         elif AppState.vpn_state == "Dropped": icon = AppState.icon_dropped
+        elif AppState.vpn_state == "Server Unreachable": icon = AppState.icon_unreachable
         elif AppState.vpn_state == "Enabled": icon = AppState.icon_info # Transition state
         else: icon = AppState.icon_disabled
         
@@ -1096,18 +1118,32 @@ class VPNTrayApp(QApplication):
         if not self.monitor_thread.isRunning():
             self.monitor_thread.start()
             
-    def on_network_status_checked(self, vpn_active: bool, route_exists: bool):
+    def on_network_status_checked(self, vpn_active: bool, route_exists: bool, pi_reachable: bool):
         """Core logic for the Kill Switch and auto-recovery."""
+        if vpn_active and route_exists:
+            self._drop_count = 0
         if vpn_active and not route_exists and not AppState.manual_disable:
             logger.info("VPN route missing but connection active, recovering...")
             self.on_enable()
         elif not vpn_active and route_exists:
-            logger.warning("VPN connection dropped! Triggering kill switch.")
-            SystemHandler.run_command(f"sudo ip route del default via {Config.VPN_GATEWAY} dev {AppState.adapter_name}", check=False)
-            AppState.vpn_state = "Dropped"
-            AppState.connection_start_time = None
-            self.update_ui_state()
-            self.tray_icon.showMessage("DragonFoxVPN", "CONNECTION DROPPED. Kill switch active.", QSystemTrayIcon.Warning, 5000)
+            self._drop_count += 1
+            if self._drop_count >= 2:
+                logger.warning("VPN connection dropped! Triggering kill switch.")
+                SystemHandler.run_command(f"sudo ip route del default via {Config.VPN_GATEWAY} dev {AppState.adapter_name}", check=False)
+                AppState.vpn_state = "Dropped"
+                AppState.connection_start_time = None
+                self._drop_count = 0
+                self.update_ui_state()
+                self.tray_icon.showMessage("DragonFoxVPN", "CONNECTION DROPPED. Kill switch active.", QSystemTrayIcon.Warning, 5000)
+        elif AppState.vpn_state in ("Disabled", "Server Unreachable"):
+            if not pi_reachable and AppState.vpn_state != "Server Unreachable":
+                logger.warning("VPN server unreachable.")
+                AppState.vpn_state = "Server Unreachable"
+                self.update_ui_state()
+            elif pi_reachable and AppState.vpn_state == "Server Unreachable":
+                logger.info("VPN server reachable again.")
+                AppState.vpn_state = "Disabled"
+                self.update_ui_state()
 
 # --- Entry Point ---
 def main():
