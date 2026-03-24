@@ -53,22 +53,43 @@ if [[ ! -f "$CONF_FILE" ]]; then
     exit 1
 fi
 
-# Patch overlay into the .ovpn file if not already present, and comment out
-# redirect-gateway / dhcp-option DNS lines (the tray app manages routing directly).
+# Patch the .ovpn file if not already patched:
+#   - Inject the overlay config directive
+#   - Comment out redirect-gateway and dhcp-option DNS (the tray app manages
+#     routing and DNS directly at the OS level)
 if [[ -n "$CONF_OVERLAY" ]] && ! grep -Fxq "$CONF_OVERLAY" "$CONF_FILE"; then
     TMPFILE=$(mktemp)
-    OVERLAY_ADDED=false
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^\<cert\> ]] && [[ "$OVERLAY_ADDED" == false ]]; then
-            echo "$CONF_OVERLAY" >> "$TMPFILE"
-            OVERLAY_ADDED=true
-        fi
-        if [[ "$line" =~ ^redirect-gateway ]] || [[ "$line" =~ ^dhcp-option[[:space:]]+DNS ]]; then
-            [[ "$line" =~ ^# ]] && echo "$line" >> "$TMPFILE" || echo "# $line" >> "$TMPFILE"
-        else
-            echo "$line" >> "$TMPFILE"
-        fi
-    done < "$CONF_FILE"
+
+    # Helper: copy file to TMPFILE with redirect-gateway/DNS lines commented out
+    patch_lines() {
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^redirect-gateway ]] || [[ "$line" =~ ^dhcp-option[[:space:]]+DNS ]]; then
+                [[ "$line" =~ ^# ]] && echo "$line" || echo "# $line"
+            else
+                echo "$line"
+            fi
+        done < "$CONF_FILE"
+    }
+
+    if grep -q "^<cert>" "$CONF_FILE"; then
+        # Inline certs: insert overlay just before the <cert> block
+        OVERLAY_ADDED=false
+        while IFS= read -r line; do
+            if [[ "$line" =~ ^\<cert\> ]] && [[ "$OVERLAY_ADDED" == false ]]; then
+                echo "$CONF_OVERLAY"
+                OVERLAY_ADDED=true
+            fi
+            if [[ "$line" =~ ^redirect-gateway ]] || [[ "$line" =~ ^dhcp-option[[:space:]]+DNS ]]; then
+                [[ "$line" =~ ^# ]] && echo "$line" || echo "# $line"
+            else
+                echo "$line"
+            fi
+        done < "$CONF_FILE" > "$TMPFILE"
+    else
+        # External certs: prepend overlay at the top of the file
+        { echo "$CONF_OVERLAY"; patch_lines; } > "$TMPFILE"
+    fi
+
     mv "$TMPFILE" "$CONF_FILE"
 fi
 
