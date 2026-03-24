@@ -1,0 +1,39 @@
+name: Build Windows Executable
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
+
+      - name: Build executable
+        run: |
+          pyinstaller --clean --noconsole --onefile --uac-admin `
+            --icon="app.ico" `
+            --version-file="version_info.txt" `
+            --name="DragonFoxVPN Tray" `
+            --exclude-module tkinter `
+            --exclude-module unittest `
+            --exclude-module pydoc `
+            --exclude-module difflib `
+            --exclude-module doctest `
+            dragonfox_vpn.py
+
+      - name: Upload executable to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/DragonFoxVPN Tray.exe
