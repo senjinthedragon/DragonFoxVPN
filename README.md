@@ -294,14 +294,6 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 
 ---
 
-## Contributing
-
-### Versioning Strategy
-
-- **Major.Minor.Patch.Build** (e.g., `1.0.1.35`)
-- The **Build** number is automatically incremented by `increment_version.py` on every Windows build.
-- **Major/Minor/Patch** are manually controlled in `version_info.txt`.
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

@@ -5,8 +5,7 @@ https://github.com/senjinthedragon/DragonFoxVPN
 Licensed under the MIT License.
 See LICENSE for full license information.
 
-Automates the full Windows build lifecycle: increments the build number
-via increment_version.py, then runs PyInstaller to produce a single
+Automates the Windows build: runs PyInstaller to produce a single
 standalone executable with version metadata and icon embedded.
 #>
 # Prerequisites: pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
@@ -14,15 +13,7 @@ standalone executable with version metadata and icon embedded.
 $ErrorActionPreference = "Stop"
 
 <#
-    Step 1: Version Increment
-    Calls the external Python script to fetch, parse, and increment the build number
-    in both version_info.txt and dragonfox_vpn.py.
-#>
-Write-Host "Updating version..."
-python increment_version.py
-
-<#
-    Step 2: PyInstaller Build
+    PyInstaller Build
     --clean: Nuke cache
     --noconsole: Hide terminal window
     --onefile: Bundle everything into one .exe
