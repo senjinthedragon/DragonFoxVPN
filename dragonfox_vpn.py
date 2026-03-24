@@ -16,6 +16,7 @@ Key Components:
 Supports Linux (native tools) and Windows (PowerShell/Netsh).
 
 Copyright (c) 2026 DragonFox Studios
+MIT License — see LICENSE for details.
 """
 
 __version__ = "1.0.1.39"

@@ -47,7 +47,11 @@ fetch available locations and trigger server switches.
 
 ### 1. Place your `.ovpn` files
 
-Put all your provider's `.ovpn` configs in `/etc/openvpn/express/`.
+Download your provider's `.ovpn` config files and place them in `/etc/openvpn/express/`.
+
+> **ExpressVPN users**: Log into your ExpressVPN account → Downloads → Manual Config → OpenVPN.
+> Download the configs for the locations you want and copy them to the Pi.
+> Each user must download their own — the files contain account-specific credentials.
 
 ### 2. Install the switch script
 
@@ -165,4 +169,6 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 
 ## 📜 License
 
-Copyright (c) 2026 DragonFox Studios. All rights reserved.
+MIT License — see [LICENSE](LICENSE) for details.
+
+Bundled dependency: [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
