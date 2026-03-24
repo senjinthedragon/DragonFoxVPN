@@ -77,7 +77,7 @@ impl VpnApi {
     }
 }
 
-fn urlencoded(s: &str) -> String {
+pub fn urlencoded(s: &str) -> String {
     s.chars()
         .map(|c| match c {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
@@ -91,7 +91,7 @@ fn urlencoded(s: &str) -> String {
         .collect()
 }
 
-fn parse_locations(html: &str) -> (Vec<Location>, Option<String>) {
+pub fn parse_locations(html: &str) -> (Vec<Location>, Option<String>) {
     let document = Html::parse_document(html);
 
     let dropdown_sel = Selector::parse(".dropdown-content > *").unwrap();
@@ -146,7 +146,7 @@ fn parse_locations(html: &str) -> (Vec<Location>, Option<String>) {
     (locations, current_location)
 }
 
-fn strip_continent_emojis(s: &str) -> String {
+pub fn strip_continent_emojis(s: &str) -> String {
     // Remove common continent emoji prefixes (multi-byte Unicode)
     let emojis = ["🌍", "🌎", "🌏", "🌐"];
     let mut result = s.to_string();
@@ -156,7 +156,7 @@ fn strip_continent_emojis(s: &str) -> String {
     result.trim().to_string()
 }
 
-fn strip_country_emojis(s: &str) -> String {
+pub fn strip_country_emojis(s: &str) -> String {
     // Country flag emojis are regional indicator pairs (U+1F1xx).
     // Filter them out character by character.
     s.chars()

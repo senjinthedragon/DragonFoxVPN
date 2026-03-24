@@ -184,7 +184,7 @@ impl SystemHandler {
 }
 
 /// Extract all IPv4 addresses from a string.
-fn extract_ips(text: &str) -> Vec<String> {
+pub fn extract_ips(text: &str) -> Vec<String> {
     let mut ips = Vec::new();
     let bytes = text.as_bytes();
     let mut i = 0;
@@ -206,7 +206,7 @@ fn extract_ips(text: &str) -> Vec<String> {
     ips
 }
 
-fn is_valid_ipv4(s: &str) -> bool {
+pub fn is_valid_ipv4(s: &str) -> bool {
     let parts: Vec<&str> = s.split('.').collect();
     if parts.len() != 4 {
         return false;
@@ -221,12 +221,12 @@ fn is_valid_ipv4(s: &str) -> bool {
 
 /// Minimal regex-lite helper - matches whole string against a simple character-class pattern.
 /// Only supports `^[chars]+$` patterns used in this module.
-struct SimpleRegex {
+pub struct SimpleRegex {
     pattern: &'static str,
 }
 
 impl SimpleRegex {
-    fn is_match(&self, s: &str) -> bool {
+    pub fn is_match(&self, s: &str) -> bool {
         if self.pattern == r"^[a-zA-Z0-9._:-]+$" {
             !s.is_empty()
                 && s.chars().all(|c| {
@@ -238,6 +238,6 @@ impl SimpleRegex {
     }
 }
 
-fn regex_lite(pattern: &'static str) -> SimpleRegex {
+pub fn regex_lite(pattern: &'static str) -> SimpleRegex {
     SimpleRegex { pattern }
 }
