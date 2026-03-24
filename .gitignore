@@ -1,36 +1,6 @@
 # Rust
 target/
 
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-share/python-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Environment
-.venv/
-venv/
-ENV/
-env/
-
 # IDEs
 .vscode/
 .idea/
@@ -39,14 +9,9 @@ env/
 .DS_Store
 Thumbs.db
 
-# PyInstaller
-*.spec
-
 # Claude Code
 .claude/
 
 # Runtime-generated
-dist/
-build/
 flags/
 dragonfox_vpn.json
