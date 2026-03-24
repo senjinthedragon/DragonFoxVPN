@@ -33,8 +33,8 @@ reduce the binary size and memory footprint significantly.
 ## Architecture
 
 ```text
-[Client PC]  -->  [Raspberry Pi (OpenVPN gateway)]  -->  [Internet via VPN]
-  tray app            backend web UI + switch script
+[Client PC]  →  [Raspberry Pi (OpenVPN gateway)]  →  [Internet via VPN]
+  tray app   ←   backend web UI + switch script
 ```
 
 The tray app modifies the **client machine's** routing table to send all traffic through the Pi.
