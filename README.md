@@ -9,6 +9,10 @@ internet, with this tray app managing routing on each client machine.
 > **VPN provider**: The included backend is written for **ExpressVPN** `.ovpn` configs, but the
 > shell script and web UI are straightforward to adapt to any OpenVPN-compatible provider.
 
+**Note on executable size**: The Windows executable is large (~47MB) because it bundles the
+Python runtime and Qt libraries. A rewrite of the tray client in Rust is planned, which will
+reduce the binary size and memory footprint significantly.
+
 ## Features
 
 - **Location Switching**:
