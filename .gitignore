@@ -35,3 +35,15 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# PyInstaller
+*.spec
+
+# Claude Code
+.claude/
+
+# Runtime-generated
+dist/
+build/
+flags/
+dragonfox_vpn.json
