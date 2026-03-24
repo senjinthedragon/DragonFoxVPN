@@ -65,11 +65,7 @@ logger = logging.getLogger("DragonFoxVPN")
 # --- Constants & Configuration ---
 class Config:
     """Global configuration constants."""
-    ISP_GATEWAY: str = "10.0.0.1"
-    VPN_GATEWAY: str = "10.0.0.20"
-    DNS_SERVER: str = "10.0.0.20"
     CHECK_INTERVAL: int = 3000  # milliseconds
-    VPN_SWITCHER_URL: str = "https://vpn.hatchling.org"
     
     @staticmethod
     def get_config_path() -> Path:
@@ -513,7 +509,12 @@ class ConfigManager:
         self.config = {
             "favorites": [],
             "auto_connect": False,
-            "last_location": None
+            "last_location": None,
+            "vpn_gateway": None,
+            "isp_gateway": None,
+            "dns_server": None,
+            "switcher_url": None,
+            "setup_complete": False
         }
         self.load()
 
@@ -556,6 +557,87 @@ class ConfigManager:
 # Global config instance
 config_manager = ConfigManager()
 
+# --- Setup Dialog ---
+class SetupDialog(QDialog):
+    """First-run and settings configuration dialog."""
+    def __init__(self, parent=None, first_run=False):
+        super().__init__(parent)
+        self.setWindowTitle("DragonFoxVPN Setup" if first_run else "Settings")
+        self.setMinimumWidth(440)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.setContentsMargins(24, 24, 24, 24)
+
+        header = QLabel("Initial Setup" if first_run else "Network Settings")
+        header.setObjectName("header")
+        header.setAlignment(Qt.AlignCenter)
+        layout.addWidget(header)
+
+        if first_run:
+            note = QLabel("Enter your network details to get started.")
+            note.setWordWrap(True)
+            note.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+            note.setAlignment(Qt.AlignCenter)
+            layout.addWidget(note)
+
+        def add_field(label_text, placeholder, key):
+            lbl = QLabel(label_text)
+            lbl.setStyleSheet("color: #aaaaaa; font-size: 12px;")
+            field = QLineEdit()
+            field.setPlaceholderText(placeholder)
+            current = config_manager.get(key)
+            if current:
+                field.setText(current)
+            layout.addWidget(lbl)
+            layout.addWidget(field)
+            return field
+
+        self.vpn_gw  = add_field("VPN Gateway IP  (your Pi's LAN address)",    "e.g. 10.0.0.20",            "vpn_gateway")
+        self.isp_gw  = add_field("ISP Gateway IP  (your router's LAN address)", "e.g. 10.0.0.1",             "isp_gateway")
+        self.dns     = add_field("DNS Server  (usually the same as VPN Gateway)", "e.g. 10.0.0.20",           "dns_server")
+        self.url     = add_field("VPN Switcher URL  (URL of the backend web UI)", "e.g. https://vpn.local",   "switcher_url")
+
+        layout.addSpacing(8)
+        btn_layout = QHBoxLayout()
+        if not first_run:
+            cancel_btn = QPushButton("Cancel")
+            cancel_btn.setObjectName("cancel_btn")
+            cancel_btn.clicked.connect(self.reject)
+            btn_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save Settings")
+        save_btn.clicked.connect(self.on_save)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+
+        if first_run:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+
+    def on_save(self):
+        ip_re = re.compile(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$')
+        vpn_gw = self.vpn_gw.text().strip()
+        isp_gw = self.isp_gw.text().strip()
+        dns    = self.dns.text().strip()
+        url    = self.url.text().strip()
+
+        if not all([vpn_gw, isp_gw, dns, url]):
+            QMessageBox.warning(self, "Incomplete", "All fields are required.")
+            return
+        if not ip_re.match(vpn_gw) or not ip_re.match(isp_gw) or not ip_re.match(dns):
+            QMessageBox.warning(self, "Invalid Input", "Gateway and DNS fields must be valid IP addresses.")
+            return
+        if not url.startswith(("http://", "https://")):
+            QMessageBox.warning(self, "Invalid Input", "Switcher URL must start with http:// or https://")
+            return
+
+        config_manager.set("vpn_gateway",    vpn_gw)
+        config_manager.set("isp_gateway",    isp_gw)
+        config_manager.set("dns_server",     dns)
+        config_manager.set("switcher_url",   url)
+        config_manager.set("setup_complete", True)
+        self.accept()
+
 # --- VPN API ---
 class VPNApi:
     """Handles interaction with the VPN switcher web backend."""
@@ -595,7 +677,7 @@ class VPNApi:
     def fetch_locations() -> Tuple[List[Dict[str, str]], Optional[str]]:
         """Fetches available VPN locations from the backend."""
         try:
-            response = requests.get(Config.VPN_SWITCHER_URL, timeout=5, verify=False)
+            response = requests.get(config_manager.get("switcher_url"), timeout=5, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -639,7 +721,7 @@ class VPNApi:
         """Switches VPN location via a POST request."""
         try:
             response = requests.post(
-                Config.VPN_SWITCHER_URL,
+                config_manager.get("switcher_url"),
                 data={'location': location_value},
                 timeout=10,
                 verify=False
@@ -662,9 +744,11 @@ class NetworkMonitorThread(QThread):
     """Worker thread for network status monitoring."""
     status_checked = pyqtSignal(bool, bool, bool)
     def run(self):
-        route_exists = SystemHandler.is_route_active(Config.VPN_GATEWAY, AppState.adapter_name)
-        vpn_active = SystemHandler.check_connection(Config.VPN_GATEWAY, Config.ISP_GATEWAY) if route_exists else False
-        pi_reachable = SystemHandler.ping_host(Config.VPN_GATEWAY)
+        vpn_gw = config_manager.get("vpn_gateway")
+        isp_gw = config_manager.get("isp_gateway")
+        route_exists = SystemHandler.is_route_active(vpn_gw, AppState.adapter_name)
+        vpn_active = SystemHandler.check_connection(vpn_gw, isp_gw) if route_exists else False
+        pi_reachable = SystemHandler.ping_host(vpn_gw)
         self.status_checked.emit(vpn_active, route_exists, pi_reachable)
 
 class LocationSwitchThread(QThread):
@@ -910,7 +994,7 @@ class StatusDashboard(QDialog):
         layout.addWidget(self.status_frame)
         
         self.loc_label = QLabel(f"🌍 Location: {AppState.vpn_location}")
-        self.ip_label = QLabel(f"🔒 Gateway: {Config.VPN_GATEWAY}")
+        self.ip_label = QLabel(f"🔒 Gateway: {config_manager.get('vpn_gateway')}")
         self.time_label = QLabel("⏱️ Duration: --:--:--")
         
         for lbl in [self.loc_label, self.ip_label, self.time_label]:
@@ -968,7 +1052,12 @@ class VPNTrayApp(QApplication):
         self.setup_menu()
         self.tray_icon.show()
         self.tray_icon.activated.connect(self.on_tray_activated)
-        
+
+        # First-run setup — must complete before any networking starts
+        if not config_manager.get("setup_complete"):
+            if SetupDialog(self.anchor, first_run=True).exec_() != QDialog.Accepted:
+                sys.exit(0)
+
         self.init_app_state()
         
         # Background tasks
@@ -1010,11 +1099,15 @@ class VPNTrayApp(QApplication):
             self.action_autostart.setEnabled(False)
             self.action_autostart.setText("Run on Startup (Windows only)")
         
+        self.action_settings = QAction("⚙️ Settings...", self)
+        self.action_settings.triggered.connect(self.on_settings)
+
         self.action_exit = QAction("Exit", self)
         self.action_exit.triggered.connect(self.on_exit)
-        
-        items = [self.action_dashboard, None, self.action_enable, self.action_disable, 
-                 None, self.action_location, self.action_autoconnect, self.action_autostart, None, self.action_exit]
+
+        items = [self.action_dashboard, None, self.action_enable, self.action_disable,
+                 None, self.action_location, self.action_autoconnect, self.action_autostart,
+                 None, self.action_settings, None, self.action_exit]
         for item in items:
             if item is None: self.menu.addSeparator()
             else: self.menu.addAction(item)
@@ -1077,7 +1170,7 @@ class VPNTrayApp(QApplication):
         AppState.vpn_state = "Enabling..."
         self.update_ui_state()
         
-        success = SystemHandler.enable_routing(AppState.adapter_name, Config.VPN_GATEWAY, Config.DNS_SERVER)
+        success = SystemHandler.enable_routing(AppState.adapter_name, config_manager.get("vpn_gateway"), config_manager.get("dns_server"))
         SystemHandler.flush_dns()
         
         if success:
@@ -1092,7 +1185,7 @@ class VPNTrayApp(QApplication):
     def on_disable(self):
         logger.info("Disabling VPN routing...")
         AppState.manual_disable = True
-        SystemHandler.disable_routing(AppState.adapter_name, Config.VPN_GATEWAY)
+        SystemHandler.disable_routing(AppState.adapter_name, config_manager.get("vpn_gateway"))
         SystemHandler.flush_dns()
         AppState.vpn_state = "Disabled"
         AppState.connection_start_time = None
@@ -1108,6 +1201,11 @@ class VPNTrayApp(QApplication):
             self.on_disable()
             QTimer.singleShot(1500, self.on_enable)
         self.update_ui_state()
+
+    def on_settings(self):
+        if SetupDialog(self.anchor).exec_() == QDialog.Accepted:
+            AppState.adapter_name = SystemHandler.get_active_adapter()
+            self.tray_icon.showMessage("DragonFoxVPN", "Settings saved.", QSystemTrayIcon.Information, 2000)
 
     def on_exit(self):
         logger.info("Exiting application...")
@@ -1129,7 +1227,7 @@ class VPNTrayApp(QApplication):
             self._drop_count += 1
             if self._drop_count >= 2:
                 logger.warning("VPN connection dropped! Triggering kill switch.")
-                SystemHandler.run_command(f"sudo ip route del default via {Config.VPN_GATEWAY} dev {AppState.adapter_name}", check=False)
+                SystemHandler.run_command(f"sudo ip route del default via {config_manager.get('vpn_gateway')} dev {AppState.adapter_name}", check=False)
                 AppState.vpn_state = "Dropped"
                 AppState.connection_start_time = None
                 self._drop_count = 0

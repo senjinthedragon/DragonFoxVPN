@@ -1,0 +1,89 @@
+/* DragonFoxVPN Switcher - Web UI Styles
+   Customise colours and fonts to match your setup. */
+
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', Roboto, sans-serif;
+}
+
+h1, h3, form, p {
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+    color: #e0e0e0;
+}
+
+h3 { margin: 0; padding: 0; }
+
+p.error { color: #f44336; }
+
+.dropdown {
+    margin: 20px 0;
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-width: 400px;
+}
+
+.dropdown-btn {
+    padding: 8px 12px;
+    border: 1px solid #555;
+    border-radius: 4px;
+    cursor: pointer;
+    background: #0e639c;
+    color: #fff;
+    width: 100%;
+    text-align: left;
+}
+
+.dropdown-btn:hover { background: #1177bb; }
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background: #252526;
+    border: 1px solid #444;
+    border-radius: 4px;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+}
+
+.dropdown-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    background: #2d2d2d;
+    color: #e0e0e0;
+}
+
+.dropdown-item:hover { background: #37373d; }
+
+.dropdown-item.active {
+    background: #094770;
+    color: #fff;
+    font-weight: bold;
+}
+
+.optgroup-label {
+    font-weight: bold;
+    padding: 6px 12px;
+    display: flex;
+    align-items: center;
+    background: #1e1e1e;
+    color: #aaaaaa;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.dropdown-item .fi { margin-right: 8px; }
