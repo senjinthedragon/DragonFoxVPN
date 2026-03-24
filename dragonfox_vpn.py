@@ -895,10 +895,6 @@ class ModernLocationDialog(QDialog):
             if is_fav:
                  display_text = "⭐ " + display_text
             
-            # If no icon available yet, and we are on Windows, we might want to avoid the ugly unicode
-            # But the original code was: emoji + label.
-            # If icon is present, use it.
-            
             item = QListWidgetItem(display_text)
             if icon:
                 item.setIcon(icon)
@@ -918,10 +914,7 @@ class ModernLocationDialog(QDialog):
         item = QListWidgetItem(text)
         item.setFlags(Qt.NoItemFlags) # Non-selectable
         item.setData(Qt.UserRole, "header")
-        # Use custom styling via QSS ID selector simulation or iterate in paint?
-        # QListWidget doesn't support IDs per item easily. 
-        # But we added QListWidget::item#header in CSS? No, that selector won't work on ITEM.
-        # We have to set property or use setBackground.
+        # QSS can't style individual list items, so we set colors directly.
         item.setForeground(QBrush(QColor("#aaaaaa")))
         item.setBackground(QColor("#333333"))
         font = item.font()
@@ -1069,7 +1062,7 @@ class VPNTrayApp(QApplication):
         
         self.monitor_thread = NetworkMonitorThread()
         self.monitor_thread.status_checked.connect(self.on_network_status_checked)
-        self._drop_count = 0
+        self._drop_count = 0  # consecutive failed checks; kill switch fires at 2
 
     def setup_menu(self):
         self.menu = QMenu()
@@ -1223,6 +1216,7 @@ class VPNTrayApp(QApplication):
         if vpn_active and route_exists:
             self._drop_count = 0
         if vpn_active and not route_exists and not AppState.manual_disable:
+            # Route was cleared externally (e.g. network restart) while VPN is still up - re-apply it.
             logger.info("VPN route missing but connection active, recovering...")
             self.on_enable()
         elif not vpn_active and route_exists:
