@@ -20,7 +20,7 @@ Key components:
 Supports Linux (native tools) and Windows (PowerShell/Netsh).
 """
 
-__version__ = "1.0.1.39"
+__version__ = "1.1.0"
 
 import datetime
 import json
