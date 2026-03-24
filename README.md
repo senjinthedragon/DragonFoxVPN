@@ -47,7 +47,12 @@ fetch available locations and trigger server switches.
 
 ### 1. Place your `.ovpn` files
 
-Download your provider's `.ovpn` config files and place them in `/etc/openvpn/express/`.
+Download your provider's `.ovpn` config files and place them in `/etc/openvpn/client/configs/`.
+
+```bash
+sudo mkdir -p /etc/openvpn/client/configs
+sudo cp *.ovpn /etc/openvpn/client/configs/
+```
 
 > **ExpressVPN users**: Log into your ExpressVPN account → Downloads → Manual Config → OpenVPN.
 > Download the configs for the locations you want and copy them to the Pi.

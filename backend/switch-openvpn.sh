@@ -20,7 +20,7 @@
 set -euo pipefail
 
 # --- Configuration ---
-EXPRESS_DIR="/etc/openvpn/express"            # Directory containing your .ovpn files
+EXPRESS_DIR="/etc/openvpn/client/configs"     # Directory containing your .ovpn files
 CLIENT_LINK="/etc/openvpn/client/active.conf" # Symlink that the OpenVPN service reads
 LOCATIONS_FILE="/etc/openvpn/locations.txt"   # Cached list of available config names
 OPENVPN_SERVICE="openvpn-client@active"       # systemd service to restart on switch
