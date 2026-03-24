@@ -78,6 +78,9 @@ Edit the variables at the top of the script to match your network:
 | `LAN_NET` | Your LAN subnet (e.g. `192.168.1.0/24`) |
 | `PI_IP` | Pi's own LAN IP — excluded from VPN routing so the Pi keeps a direct connection |
 
+> You never run this script manually. OpenVPN calls it automatically every time the tunnel
+> comes up, via the `up` directive in `common.conf`.
+
 ### 4. Set up the shared OpenVPN config
 
 ```bash
