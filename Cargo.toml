@@ -1,0 +1,43 @@
+[package]
+name = "dragonfox-vpn"
+version = "1.1.0"
+edition = "2021"
+description = "DragonFoxVPN - System tray VPN management application"
+authors = ["Senjin the Dragon"]
+license = "MIT"
+repository = "https://github.com/senjinthedragon/DragonFoxVPN"
+
+[[bin]]
+name = "DragonFoxVPN"
+path = "src/main.rs"
+
+[dependencies]
+eframe = { version = "0.28", default-features = false, features = ["default_fonts", "glow"] }
+egui = "0.28"
+tray-icon = "0.13"
+ureq = { version = "2", features = ["native-tls"] }
+native-tls = "0.2"
+scraper = "0.19"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+env_logger = "0.11"
+directories = "5"
+image = { version = "0.24", default-features = false, features = ["png"] }
+chrono = "0.4"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"
+
+[build-dependencies]
+winresource = { version = "0.1", optional = true }
+
+[features]
+default = []
+windows-resources = ["winresource"]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1

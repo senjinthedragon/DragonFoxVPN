@@ -1,11 +1,11 @@
-name: Build Windows Executable
+name: Build Release Executables
 
 on:
   release:
     types: [published]
 
 jobs:
-  build:
+  build-windows:
     runs-on: windows-latest
     permissions:
       contents: write
@@ -14,28 +14,56 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4.2.2
 
-      - name: Set up Python
-        uses: actions/setup-python@v5.4.0
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
         with:
-          python-version: '3.12'
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: windows-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: windows-cargo-
 
-      - name: Install dependencies
-        run: pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
+      - name: Build release
+        run: cargo build --release
 
-      - name: Build executable
-        run: |
-          pyinstaller --clean --noconsole --onefile --uac-admin `
-            --icon="app.ico" `
-            --version-file="version_info.txt" `
-            --name="DragonFoxVPN Tray" `
-            --exclude-module tkinter `
-            --exclude-module unittest `
-            --exclude-module pydoc `
-            --exclude-module difflib `
-            --exclude-module doctest `
-            dragonfox_vpn.py
-
-      - name: Upload executable to release
+      - name: Upload to release
         uses: softprops/action-gh-release@v2.3.2
         with:
-          files: dist/DragonFoxVPN Tray.exe
+          files: target/release/DragonFoxVPN.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libayatana-appindicator3-dev libgtk-3-dev
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: linux-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: linux-cargo-
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2.3.2
+        with:
+          files: target/release/DragonFoxVPN

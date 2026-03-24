@@ -5,27 +5,21 @@ https://github.com/senjinthedragon/DragonFoxVPN
 Licensed under the MIT License.
 See LICENSE for full license information.
 
-Automates the Windows build: runs PyInstaller to produce a single
-standalone executable with version metadata and icon embedded.
+Automates the Windows release build using Cargo.
+The output binary is placed in target\release\DragonFoxVPN.exe.
+Requires Rust (https://rustup.rs) and the MSVC toolchain.
 #>
-# Prerequisites: pip install PyQt5 requests beautifulsoup4 pyinstaller pycountry
+# Prerequisites: Rust stable toolchain (rustup), MSVC build tools
 
 $ErrorActionPreference = "Stop"
 
-<#
-    PyInstaller Build
-    --clean: Nuke cache
-    --noconsole: Hide terminal window
-    --onefile: Bundle everything into one .exe
-    --uac-admin: Manifest requiring Admin privileges
-    --exclude-module: Strip unused modules to save space (~some MBs)
-#>
-Write-Host "Building DragonFoxVPN Tray..."
-pyinstaller --clean --noconsole --onefile --uac-admin --icon="app.ico" --version-file="version_info.txt" --name="DragonFoxVPN Tray" --exclude-module tkinter --exclude-module unittest --exclude-module pydoc --exclude-module difflib --exclude-module doctest dragonfox_vpn.py
+Write-Host "Building DragonFoxVPN (Rust release)..."
+cargo build --release
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "Build successful! Executable is in dist\DragonFoxVPN Tray.exe"
+    Write-Host "Build successful! Executable is in target\release\DragonFoxVPN.exe"
 }
 else {
     Write-Host "Build failed!"
+    exit 1
 }

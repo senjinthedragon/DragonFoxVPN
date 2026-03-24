@@ -9,26 +9,22 @@ internet, with this tray app managing routing on each client machine.
 > **VPN provider**: The included backend is written for **ExpressVPN** `.ovpn` configs, but the
 > shell script and web UI are straightforward to adapt to any OpenVPN-compatible provider.
 
-**Note on executable size**: The Windows executable is large (~47MB) because it bundles the
-Python runtime and Qt libraries. A rewrite of the tray client in Rust is planned, which will
-reduce the binary size and memory footprint significantly.
-
 ## Features
 
 - **Location Switching**:
-    - Searchable dialog with flags
-    - Grouped by continent (Europe, Asia, Americas, etc.)
-    - Favorites system
+  - Searchable dialog with flags
+  - Grouped by continent (Europe, Asia, Americas, etc.)
+  - Favorites system
 - **Smart Automation**:
-    - **Auto-Connect**: Connects to the last used location on app launch.
-    - **Auto-Start**: (Windows) Option to launch automatically on system login.
+  - **Auto-Connect**: Connects to the last used location on app launch.
+  - **Auto-Start**: (Windows) Option to launch automatically on system login.
 - **Security & Safety**:
-    - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly.
-    - **Drop Debouncing**: Requires two consecutive failed checks before triggering the kill switch, avoiding false positives.
-    - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
+  - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly.
+  - **Drop Debouncing**: Requires two consecutive failed checks before triggering the kill switch, avoiding false positives.
+  - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
 - **Real-time Monitoring**:
-    - Dashboard showing connection status, gateway IP, and session duration.
-    - Tray icon changes color based on status (green=Connected, yellow=Disabled, red=Dropped, black=Server Unreachable).
+  - Dashboard showing connection status, gateway IP, and session duration.
+  - Tray icon changes colour based on status (green=Connected, yellow=Disabled, red=Dropped, grey=Server Unreachable).
 
 ## Architecture
 
@@ -65,12 +61,12 @@ sudo nano /etc/dragonfoxvpn/config.conf
 
 The file is well-commented. The values you'll need to change are:
 
-| Setting | How to find it |
-|---|---|
-| `LAN_IF` | Run `ip link` - it's the interface with your LAN IP (usually `eth0`) |
-| `LAN_NET` | Your router's subnet, e.g. `192.168.1.0/24` - check your router's DHCP settings |
-| `PI_IP` | The Pi's own LAN IP address |
-| `CONF_PREFIX` | The common prefix of your `.ovpn` filenames, e.g. `my_expressvpn_` |
+| Setting       | How to find it                                                                  |
+| ------------- | ------------------------------------------------------------------------------- |
+| `LAN_IF`      | Run `ip link` - it's the interface with your LAN IP (usually `eth0`)            |
+| `LAN_NET`     | Your router's subnet, e.g. `192.168.1.0/24` - check your router's DHCP settings |
+| `PI_IP`       | The Pi's own LAN IP address                                                     |
+| `CONF_PREFIX` | The common prefix of your `.ovpn` filenames, e.g. `my_expressvpn_`              |
 
 Everything else can be left as the default unless you have a specific reason to change it.
 
@@ -170,16 +166,34 @@ sudo systemctl reload apache2
 
 ### Prerequisites
 
-- **Python 3.10+**
-- **pip** package manager
-
-### Dependencies
+- **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
+- **Windows**: MSVC build tools (Visual Studio Build Tools or Visual Studio with the C++ workload)
+- **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
 
 ```bash
-pip install PyQt5 requests beautifulsoup4 pycountry
+# Arch/Garuda
+sudo pacman -S libayatana-appindicator
+
+# Debian/Ubuntu
+sudo apt install libayatana-appindicator3-dev
 ```
 
-*On Linux, installing `python-pyqt5` via your package manager is recommended for better system integration.*
+### Building
+
+```bash
+cargo build --release
+```
+
+The output binary is placed at:
+
+- **Linux**: `target/release/DragonFoxVPN`
+- **Windows**: `target\release\DragonFoxVPN.exe`
+
+On Windows you can also use the included PowerShell script:
+
+```powershell
+.\build_windows.ps1
+```
 
 ### Linux: passwordless sudo for network commands
 
@@ -199,47 +213,32 @@ yourusername ALL=(root) NOPASSWD: /sbin/ip, /usr/bin/resolvectl, /sbin/sysctl, /
 Then run the app normally (no sudo):
 
 ```bash
-python dragonfox_vpn.py
+./target/release/DragonFoxVPN
 ```
 
 ### First Run
 
 On first launch the app shows a setup dialog. Here's what each field means:
 
-| Field | What to enter |
-|---|---|
-| **VPN Gateway IP** | Your Pi's LAN IP address (the same IP you SSH into it with) |
-| **ISP Gateway IP** | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
-| **DNS Server** | Enter the same IP as your VPN Gateway - the Pi handles DNS when connected |
-| **VPN Switcher URL** | `http://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20` |
+| Field                | What to enter                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
+| **VPN Gateway IP**   | Your Pi's LAN IP address (the same IP you SSH into it with)                                      |
+| **ISP Gateway IP**   | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
+| **DNS Server**       | Enter the same IP as your VPN Gateway - the Pi handles DNS when connected                        |
+| **VPN Switcher URL** | `http://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20`                          |
 
 Settings are saved to the config file and can be changed later via **Settings...** in the tray menu.
-
-### Building for Windows
-
-The project includes a fully automated build script:
-
-1. Open PowerShell in the project directory.
-2. Run:
-
-    ```powershell
-    .\build_windows.ps1
-    ```
-
-3. The output executable will be in `dist\DragonFoxVPN Tray.exe`.
-
-The build script auto-increments the build number and embeds version metadata. Requires `app.ico` and `version_info.txt` in the root directory.
 
 ## Running
 
 ### Windows
 
-Run `DragonFoxVPN Tray.exe` as **Administrator** (required to modify the routing table and network settings).
+Run `DragonFoxVPN.exe` as **Administrator** (required to modify the routing table and network settings).
 
 ### Linux
 
 ```bash
-python dragonfox_vpn.py
+./target/release/DragonFoxVPN
 ```
 
 (No sudo needed if you followed the sudoers step above.)
@@ -251,7 +250,7 @@ The application stores its configuration in:
 - **Windows**: `%APPDATA%\DragonFoxVPN\dragonfox_vpn.json`
 - **Linux**: `~/.config/dragonfox_vpn.json`
 
-Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
+Flag icons are cached locally in a `flags` subdirectory alongside the config file.
 
 ---
 
