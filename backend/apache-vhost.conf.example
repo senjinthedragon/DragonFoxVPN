@@ -2,9 +2,6 @@
 #
 # Copy to /etc/apache2/sites-available/vpn.conf and adjust for your setup.
 # Enable with: sudo a2ensite vpn && sudo systemctl reload apache2
-#
-# Requires mod_proxy_fcgi for PHP-FPM:
-#   sudo a2enmod proxy_fcgi setenvif && sudo a2enconf php8.2-fpm
 
 <VirtualHost *:443>
     ServerName vpn.local   # Change to your hostname or local IP
@@ -20,18 +17,13 @@
         Options FollowSymLinks
     </Directory>
 
-    # PHP-FPM - adjust socket path for your PHP version
-    <FilesMatch \.php$>
-        SetHandler "proxy:unix:/run/php/php8.2-fpm.sock|fcgi://localhost/"
-    </FilesMatch>
-
     # SSL - recommended even on LAN
     # SSLEngine on
     # SSLCertificateFile    /etc/ssl/certs/vpn.pem
     # SSLCertificateKeyFile /etc/ssl/private/vpn.key
 </VirtualHost>
 
-# HTTP → HTTPS redirect
+# HTTP -> HTTPS redirect
 <VirtualHost *:80>
     ServerName vpn.local
     Redirect permanent / https://vpn.local/

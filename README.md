@@ -45,9 +45,7 @@ independently - no router configuration required.
 ### Prerequisites
 
 ```bash
-sudo apt install openvpn apache2 php8.2 php8.2-fpm libapache2-mod-fcgid
-sudo a2enmod proxy_fcgi setenvif
-sudo a2enconf php8.2-fpm
+sudo apt install openvpn apache2 php8.2 libapache2-mod-php8.2
 sudo systemctl restart apache2
 ```
 
@@ -258,7 +256,6 @@ Flag icons are cached locally in a `flags` subdirectory to reduce bandwidth.
 ### Web UI not accessible
 
 - Confirm Apache is running: `sudo systemctl status apache2`
-- Confirm PHP-FPM is running: `sudo systemctl status php8.2-fpm`
 - Check the vhost `Require ip` line matches your client's subnet
 - Try accessing by IP directly: `http://<pi-ip>/` to rule out DNS issues
 
