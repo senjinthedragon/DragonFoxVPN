@@ -100,6 +100,7 @@ pub struct DragonFoxApp {
 
     // Whether a network check is already running
     check_in_flight: bool,
+    exiting: bool,
 
     // Dialog visibility flags
     show_setup_dialog: bool,
@@ -108,7 +109,7 @@ pub struct DragonFoxApp {
     first_run: bool,
 
     // Dialog state
-    setup_state: SetupDialogState,
+    setup_state: Arc<Mutex<SetupDialogState>>,
     location_state: Arc<Mutex<LocationDialogState>>,
 
     // Flag image textures: iso_code → egui TextureHandle
@@ -225,11 +226,12 @@ impl DragonFoxApp {
             drop_count: 0,
             next_check: Instant::now() + Duration::from_secs(3),
             check_in_flight: false,
+            exiting: false,
             show_setup_dialog: first_run,
             show_location_dialog: false,
             show_dashboard: false,
             first_run,
-            setup_state,
+            setup_state: Arc::new(Mutex::new(setup_state)),
             location_state: Arc::new(Mutex::new(LocationDialogState::default())),
             flag_textures: std::collections::HashMap::new(),
         });
@@ -572,142 +574,106 @@ impl DragonFoxApp {
     // --------------------------------------------------------------------------
 
     fn draw_setup_dialog(&mut self, ctx: &Context) {
-        let title = if self.first_run {
-            "DragonFoxVPN - Initial Setup"
-        } else {
-            "DragonFoxVPN - Settings"
-        };
+        let first_run = self.first_run;
+        let ss = Arc::clone(&self.setup_state);
+        let cfg = Arc::clone(&self.config);
 
-        let mut open = true;
-        egui::Window::new(title)
-            .open(&mut open)
-            .resizable(false)
-            .collapsible(false)
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .min_width(440.0)
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.heading(if self.first_run {
-                        "Initial Setup"
-                    } else {
-                        "Network Settings"
-                    });
-                    if self.first_run {
-                        ui.colored_label(
-                            egui::Color32::GRAY,
-                            "Enter your network details to get started.",
-                        );
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("setup_dialog"),
+            egui::ViewportBuilder::default()
+                .with_title(if first_run {
+                    "DragonFoxVPN — Initial Setup"
+                } else {
+                    "DragonFoxVPN — Settings"
+                })
+                .with_inner_size([500.0, 360.0])
+                .with_resizable(false)
+                .with_maximize_button(false),
+            move |ctx, _class| {
+                ctx.set_visuals(egui::Visuals::dark());
+
+                // Block X-button close during mandatory first-run setup.
+                if ctx.input(|i| i.viewport().close_requested()) {
+                    if first_run {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                        if let Ok(mut s) = ss.lock() {
+                            s.error_msg =
+                                Some("Setup is required to use DragonFoxVPN.".to_string());
+                        }
+                    } else if let Ok(mut s) = ss.lock() {
+                        s.cancelled = true;
                     }
-                });
-                ui.add_space(8.0);
-
-                egui::Grid::new("setup_grid")
-                    .num_columns(2)
-                    .spacing([8.0, 6.0])
-                    .show(ui, |ui| {
-                        ui.colored_label(egui::Color32::GRAY, "VPN Gateway IP");
-                        ui.text_edit_singleline(&mut self.setup_state.vpn_gateway);
-                        ui.end_row();
-
-                        ui.colored_label(egui::Color32::GRAY, "ISP Gateway IP");
-                        ui.text_edit_singleline(&mut self.setup_state.isp_gateway);
-                        ui.end_row();
-
-                        ui.colored_label(egui::Color32::GRAY, "DNS Server");
-                        ui.text_edit_singleline(&mut self.setup_state.dns_server);
-                        ui.end_row();
-
-                        ui.colored_label(egui::Color32::GRAY, "VPN Switcher URL");
-                        ui.text_edit_singleline(&mut self.setup_state.switcher_url);
-                        ui.end_row();
-                    });
-
-                if let Some(ref err) = self.setup_state.error_msg.clone() {
-                    ui.colored_label(egui::Color32::RED, err);
                 }
 
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if !self.first_run {
-                        if ui.button("Cancel").clicked() {
-                            self.setup_state.cancelled = true;
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.heading(if first_run { "Initial Setup" } else { "Network Settings" });
+                        if first_run {
+                            ui.colored_label(
+                                egui::Color32::GRAY,
+                                "Enter your network details to get started.",
+                            );
                         }
-                    }
-                    if ui.button("Save Settings").clicked() {
-                        self.validate_and_save_setup();
+                    });
+                    ui.add_space(8.0);
+
+                    if let Ok(mut s) = ss.lock() {
+                        egui::Grid::new("setup_grid")
+                            .num_columns(2)
+                            .spacing([8.0, 6.0])
+                            .show(ui, |ui| {
+                                ui.colored_label(egui::Color32::GRAY, "VPN Gateway IP");
+                                ui.text_edit_singleline(&mut s.vpn_gateway);
+                                ui.end_row();
+                                ui.colored_label(egui::Color32::GRAY, "ISP Gateway IP");
+                                ui.text_edit_singleline(&mut s.isp_gateway);
+                                ui.end_row();
+                                ui.colored_label(egui::Color32::GRAY, "DNS Server");
+                                ui.text_edit_singleline(&mut s.dns_server);
+                                ui.end_row();
+                                ui.colored_label(egui::Color32::GRAY, "VPN Switcher URL");
+                                ui.text_edit_singleline(&mut s.switcher_url);
+                                ui.end_row();
+                            });
+
+                        if let Some(ref err) = s.error_msg.clone() {
+                            ui.colored_label(egui::Color32::RED, err);
+                        }
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            if !first_run && ui.button("Cancel").clicked() {
+                                s.cancelled = true;
+                            }
+                            if ui.button("Save Settings").clicked() {
+                                validate_and_save(&mut s, &cfg);
+                            }
+                        });
                     }
                 });
-            });
+            },
+        );
 
-        if !open {
-            self.setup_state.cancelled = true;
-        }
-
-        // Handle result
-        if self.setup_state.submitted {
-            self.setup_state.submitted = false;
-            self.show_setup_dialog = false;
-            self.first_run = false;
-            // Re-detect adapter after settings change
-            let adapter = SystemHandler::get_active_adapter();
-            if let Ok(mut st) = self.state.lock() {
-                st.adapter_name = adapter;
-            }
-        }
-        if self.setup_state.cancelled {
-            self.setup_state.cancelled = false;
-            if self.first_run {
-                // Must complete setup - keep dialog open
-                self.setup_state.error_msg =
-                    Some("Setup is required to use DragonFoxVPN.".to_string());
-            } else {
+        // Apply results now that the viewport has rendered.
+        if let Ok(mut s) = self.setup_state.lock() {
+            if s.submitted {
+                s.submitted = false;
+                self.show_setup_dialog = false;
+                self.first_run = false;
+                let adapter = SystemHandler::get_active_adapter();
+                if let Ok(mut st) = self.state.lock() {
+                    st.adapter_name = adapter;
+                }
+            } else if s.cancelled {
+                s.cancelled = false;
                 self.show_setup_dialog = false;
             }
         }
     }
 
-    fn validate_and_save_setup(&mut self) {
-        let vpn_gw = self.setup_state.vpn_gateway.trim().to_string();
-        let isp_gw = self.setup_state.isp_gateway.trim().to_string();
-        let dns = self.setup_state.dns_server.trim().to_string();
-        let url = self.setup_state.switcher_url.trim().to_string();
-
-        if vpn_gw.is_empty() || isp_gw.is_empty() || dns.is_empty() || url.is_empty() {
-            self.setup_state.error_msg = Some("All fields are required.".to_string());
-            return;
-        }
-        if !is_valid_ip(&vpn_gw) || !is_valid_ip(&isp_gw) || !is_valid_ip(&dns) {
-            self.setup_state.error_msg =
-                Some("Gateway and DNS fields must be valid IP addresses.".to_string());
-            return;
-        }
-        if !url.starts_with("http://") && !url.starts_with("https://") {
-            self.setup_state.error_msg =
-                Some("Switcher URL must start with http:// or https://".to_string());
-            return;
-        }
-
-        if let Ok(mut cfg) = self.config.lock() {
-            cfg.vpn_gateway = Some(vpn_gw);
-            cfg.isp_gateway = Some(isp_gw);
-            cfg.dns_server = Some(dns);
-            cfg.switcher_url = Some(url.clone());
-            cfg.setup_complete = true;
-            cfg.save();
-        }
-
-        self.setup_state.error_msg = None;
-        self.setup_state.submitted = true;
-    }
-
     fn draw_location_dialog(&mut self, ctx: &Context) {
         // Poll for location-switch acceptance
-        let accepted = self
-            .location_state
-            .lock()
-            .ok()
-            .and_then(|ls| ls.accepted.clone());
-
+        // Handle accepted selection — close the dialog and optionally reconnect.
+        let accepted = self.location_state.lock().ok().and_then(|ls| ls.accepted.clone());
         if let Some(label) = accepted {
             self.show_location_dialog = false;
             let was_connected = self
@@ -715,7 +681,6 @@ impl DragonFoxApp {
                 .lock()
                 .map(|s| s.vpn_state == VpnState::Connected)
                 .unwrap_or(false);
-
             if let Ok(mut st) = self.state.lock() {
                 st.vpn_location = label.clone();
             }
@@ -726,7 +691,6 @@ impl DragonFoxApp {
             if let Ok(mut ls) = self.location_state.lock() {
                 ls.accepted = None;
             }
-
             if was_connected {
                 info!("Location changed, reconnecting...");
                 self.do_disable();
@@ -742,97 +706,86 @@ impl DragonFoxApp {
             return;
         }
 
-        let mut open = true;
-        egui::Window::new("Change VPN Location")
-            .open(&mut open)
-            .resizable(true)
-            .collapsible(false)
-            .default_size([550.0, 600.0])
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.heading("Select VPN Location");
-                });
-                ui.add_space(8.0);
+        let ls_arc = Arc::clone(&self.location_state);
+        let config_arc = Arc::clone(&self.config);
+        let bg_tx = self.bg_tx.clone();
+        // Clone textures for read access inside the closure; new ones arrive via
+        // BgMsg::FlagReady and are added to self.flag_textures by process_bg_messages
+        // before this method is called next frame.
+        let flag_textures = self.flag_textures.clone();
+        let close = Arc::new(Mutex::new(false));
+        let close_inner = Arc::clone(&close);
 
-                // Search bar
-                let mut search = {
-                    self.location_state
-                        .lock()
-                        .map(|ls| ls.search_text.clone())
-                        .unwrap_or_default()
-                };
-                if ui
-                    .add(
-                        egui::TextEdit::singleline(&mut search)
-                            .hint_text("Search countries or cities..."),
-                    )
-                    .changed()
-                {
-                    if let Ok(mut ls) = self.location_state.lock() {
-                        ls.search_text = search.clone();
-                    }
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("location_dialog"),
+            egui::ViewportBuilder::default()
+                .with_title("Change VPN Location")
+                .with_inner_size([620.0, 700.0])
+                .with_resizable(true),
+            move |ctx, _class| {
+                ctx.set_visuals(egui::Visuals::dark());
+
+                if ctx.input(|i| i.viewport().close_requested()) {
+                    *close_inner.lock().unwrap() = true;
                 }
 
-                ui.add_space(4.0);
-
-                let is_loading = self
-                    .location_state
-                    .lock()
-                    .map(|ls| ls.is_loading)
-                    .unwrap_or(false);
-                let is_switching = self
-                    .location_state
-                    .lock()
-                    .map(|ls| ls.is_switching)
-                    .unwrap_or(false);
-
-                if is_loading {
-                    ui.spinner();
-                    ui.label("Loading locations...");
-                } else {
-                    // Gather data needed for rendering
-                    let (locations, favorites, selected_value, switch_error) = {
-                        let ls = self.location_state.lock().unwrap();
-                        (
-                            ls.locations.clone(),
-                            {
-                                self.config
-                                    .lock()
-                                    .map(|c| c.favorites.clone())
-                                    .unwrap_or_default()
-                            },
-                            ls.selected_value.clone(),
-                            ls.switch_error.clone(),
-                        )
-                    };
-
-                    let lower_search = search.to_lowercase();
-
-                    // Sort: favorites first, then continent+label
-                    let mut sorted = locations.clone();
-                    sorted.sort_by(|a, b| {
-                        let af = favorites.contains(&a.label);
-                        let bf = favorites.contains(&b.label);
-                        bf.cmp(&af)
-                            .then(a.continent.cmp(&b.continent))
-                            .then(a.label.cmp(&b.label))
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.heading("Select VPN Location");
                     });
+                    ui.add_space(8.0);
 
-                    egui::ScrollArea::vertical()
-                        .max_height(440.0)
-                        .show(ui, |ui| {
+                    let mut search =
+                        ls_arc.lock().map(|ls| ls.search_text.clone()).unwrap_or_default();
+                    if ui
+                        .add(
+                            egui::TextEdit::singleline(&mut search)
+                                .hint_text("Search countries or cities..."),
+                        )
+                        .changed()
+                    {
+                        if let Ok(mut ls) = ls_arc.lock() {
+                            ls.search_text = search.clone();
+                        }
+                    }
+                    ui.add_space(4.0);
+
+                    let is_loading = ls_arc.lock().map(|ls| ls.is_loading).unwrap_or(false);
+                    let is_switching = ls_arc.lock().map(|ls| ls.is_switching).unwrap_or(false);
+
+                    if is_loading {
+                        ui.spinner();
+                        ui.label("Loading locations...");
+                    } else {
+                        let (locations, favorites, selected_value, switch_error) = {
+                            let ls = ls_arc.lock().unwrap();
+                            (
+                                ls.locations.clone(),
+                                config_arc.lock().map(|c| c.favorites.clone()).unwrap_or_default(),
+                                ls.selected_value.clone(),
+                                ls.switch_error.clone(),
+                            )
+                        };
+
+                        let lower_search = search.to_lowercase();
+                        let mut sorted = locations.clone();
+                        sorted.sort_by(|a, b| {
+                            let af = favorites.contains(&a.label);
+                            let bf = favorites.contains(&b.label);
+                            bf.cmp(&af)
+                                .then(a.continent.cmp(&b.continent))
+                                .then(a.label.cmp(&b.label))
+                        });
+
+                        egui::ScrollArea::vertical().max_height(440.0).show(ui, |ui| {
                             let mut last_section: Option<String> = None;
-
                             for loc in &sorted {
                                 if !lower_search.is_empty()
                                     && !loc.label.to_lowercase().contains(&lower_search)
                                 {
                                     continue;
                                 }
-
                                 let is_fav = favorites.contains(&loc.label);
-
-                                // Section header
                                 let section = if is_fav {
                                     "Favorites".to_string()
                                 } else {
@@ -844,21 +797,15 @@ impl DragonFoxApp {
                                     ui.colored_label(egui::Color32::GRAY, &section);
                                     ui.separator();
                                 }
-
-                                // Row
                                 let display_label = if is_fav {
                                     format!("* {}", loc.label)
                                 } else {
                                     loc.label.clone()
                                 };
-
                                 let is_selected =
                                     selected_value.as_deref() == Some(loc.value.as_str());
-
-                                // Flag image (if loaded)
                                 let iso = country_to_iso(&loc.country);
-                                let flag_tex = iso.and_then(|code| self.flag_textures.get(code));
-
+                                let flag_tex = iso.and_then(|code| flag_textures.get(code));
                                 let response = ui.horizontal(|ui| {
                                     if let Some(tex) = flag_tex {
                                         ui.image(egui::load::SizedTexture::new(
@@ -870,28 +817,23 @@ impl DragonFoxApp {
                                     }
                                     ui.selectable_label(is_selected, &display_label)
                                 });
-
-                                // Left click: select
                                 if response.inner.clicked() {
-                                    if let Ok(mut ls) = self.location_state.lock() {
+                                    if let Ok(mut ls) = ls_arc.lock() {
                                         ls.selected_value = Some(loc.value.clone());
                                         ls.selected_label = Some(loc.label.clone());
                                     }
                                 }
-
-                                // Right click: favorite toggle
                                 if response.inner.secondary_clicked() {
-                                    if let Ok(mut cfg) = self.config.lock() {
+                                    if let Ok(mut cfg) = config_arc.lock() {
                                         cfg.toggle_favorite(&loc.label);
                                     }
                                 }
-
-                                // Enqueue flag fetch if not yet loaded
+                                // Enqueue flag fetch if not yet in cache.
                                 if let Some(code) = iso {
-                                    if !self.flag_textures.contains_key(code) {
+                                    if !flag_textures.contains_key(code) {
                                         let code = code.to_string();
                                         let flags_dir = crate::config::get_flags_dir();
-                                        let tx = self.bg_tx.clone();
+                                        let tx = bg_tx.clone();
                                         let ctx2 = ctx.clone();
                                         std::thread::spawn(move || {
                                             let path = flags_dir.join(format!("{code}.png"));
@@ -901,92 +843,84 @@ impl DragonFoxApp {
                                             let _ = tx.send(BgMsg::FlagReady(code));
                                             ctx2.request_repaint();
                                         });
-                                        // Insert a placeholder so we don't re-spawn
-                                        // We'll replace it with real texture in BgMsg::FlagReady
                                     }
                                 }
                             }
                         });
 
-                    if let Some(err) = switch_error {
-                        ui.colored_label(egui::Color32::RED, &err);
-                    }
-
-                    ui.add_space(8.0);
-                    let has_selection = self
-                        .location_state
-                        .lock()
-                        .map(|ls| ls.selected_value.is_some())
-                        .unwrap_or(false);
-
-                    ui.horizontal(|ui| {
-                        if ui.button("Cancel").clicked() {
-                            if let Ok(mut ls) = self.location_state.lock() {
-                                ls.cancelled = true;
-                            }
+                        if let Some(err) = switch_error {
+                            ui.colored_label(egui::Color32::RED, &err);
                         }
+                        ui.add_space(8.0);
 
-                        let switch_label = self
-                            .location_state
-                            .lock()
-                            .ok()
-                            .and_then(|ls| ls.selected_label.clone())
-                            .map(|l| format!("Switch to {l}"))
-                            .unwrap_or_else(|| "Switch Location".to_string());
-
-                        if ui
-                            .add_enabled(
-                                has_selection && !is_switching,
-                                egui::Button::new(&switch_label),
-                            )
-                            .clicked()
-                        {
-                            let (val, lbl, url) = {
-                                let ls = self.location_state.lock().unwrap();
-                                let cfg = self.config.lock().unwrap();
-                                (
-                                    ls.selected_value.clone(),
-                                    ls.selected_label.clone(),
-                                    cfg.switcher_url.clone(),
-                                )
-                            };
-
-                            if let (Some(value), Some(label), Some(url)) = (val, lbl, url) {
-                                if let Ok(mut ls) = self.location_state.lock() {
-                                    ls.is_switching = true;
-                                    ls.switch_error = None;
+                        let has_selection =
+                            ls_arc.lock().map(|ls| ls.selected_value.is_some()).unwrap_or(false);
+                        ui.horizontal(|ui| {
+                            if ui.button("Cancel").clicked() {
+                                if let Ok(mut ls) = ls_arc.lock() {
+                                    ls.cancelled = true;
                                 }
-                                let _ls_arc = Arc::clone(&self.location_state);
-                                let tx = self.bg_tx.clone();
-                                let ctx2 = ctx.clone();
-                                std::thread::spawn(move || {
-                                    let result = match VpnApi::switch_location(&url, &value) {
-                                        Ok(_) => {
-                                            std::thread::sleep(Duration::from_secs(2));
-                                            Ok(label)
-                                        }
-                                        Err(e) => Err(e),
-                                    };
-                                    let _ = tx.send(BgMsg::LocationSwitchDone(result));
-                                    ctx2.request_repaint();
-                                });
                             }
-                        }
+                            let switch_label = ls_arc
+                                .lock()
+                                .ok()
+                                .and_then(|ls| ls.selected_label.clone())
+                                .map(|l| format!("Switch to {l}"))
+                                .unwrap_or_else(|| "Switch Location".to_string());
+                            if ui
+                                .add_enabled(
+                                    has_selection && !is_switching,
+                                    egui::Button::new(&switch_label),
+                                )
+                                .clicked()
+                            {
+                                let (val, lbl, url) = {
+                                    let ls = ls_arc.lock().unwrap();
+                                    let cfg = config_arc.lock().unwrap();
+                                    (
+                                        ls.selected_value.clone(),
+                                        ls.selected_label.clone(),
+                                        cfg.switcher_url.clone(),
+                                    )
+                                };
+                                if let (Some(value), Some(label), Some(url)) = (val, lbl, url) {
+                                    if let Ok(mut ls) = ls_arc.lock() {
+                                        ls.is_switching = true;
+                                        ls.switch_error = None;
+                                    }
+                                    let tx = bg_tx.clone();
+                                    let ctx2 = ctx.clone();
+                                    std::thread::spawn(move || {
+                                        let result = match VpnApi::switch_location(&url, &value) {
+                                            Ok(_) => {
+                                                std::thread::sleep(Duration::from_secs(2));
+                                                Ok(label)
+                                            }
+                                            Err(e) => Err(e),
+                                        };
+                                        let _ = tx.send(BgMsg::LocationSwitchDone(result));
+                                        ctx2.request_repaint();
+                                    });
+                                }
+                            }
+                            if is_switching {
+                                ui.spinner();
+                            }
+                        });
+                    }
+                });
+            },
+        );
 
-                        if is_switching {
-                            ui.spinner();
-                        }
-                    });
-                }
-            });
-
-        // Handle cancelled
-        let cancelled = self
-            .location_state
-            .lock()
-            .map(|ls| ls.cancelled)
-            .unwrap_or(false);
-        if cancelled || !open {
+        if *close.lock().unwrap() {
+            self.show_location_dialog = false;
+            if let Ok(mut ls) = self.location_state.lock() {
+                ls.cancelled = false;
+            }
+            return;
+        }
+        let cancelled = self.location_state.lock().map(|ls| ls.cancelled).unwrap_or(false);
+        if cancelled {
             self.show_location_dialog = false;
             if let Ok(mut ls) = self.location_state.lock() {
                 ls.cancelled = false;
@@ -995,80 +929,87 @@ impl DragonFoxApp {
     }
 
     fn draw_dashboard(&mut self, ctx: &Context) {
-        let mut open = true;
-        egui::Window::new("DragonFox Status")
-            .open(&mut open)
-            .resizable(false)
-            .collapsible(false)
-            .default_size([400.0, 300.0])
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-            .show(ctx, |ui| {
-                ui.vertical_centered(|ui| {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
-                        egui::RichText::new("DragonFox VPN").size(24.0).strong(),
-                    );
-                });
-                ui.add_space(12.0);
+        let state_arc = Arc::clone(&self.state);
+        let config_arc = Arc::clone(&self.config);
+        let close = Arc::new(Mutex::new(false));
+        let close_inner = Arc::clone(&close);
 
-                let (state_str, state_color, location, gateway, start_time) = {
-                    let st = self.state.lock().unwrap();
-                    let cfg = self.config.lock().unwrap();
-                    (
-                        st.vpn_state.as_str(),
-                        st.vpn_state.color(),
-                        st.vpn_location.clone(),
-                        cfg.vpn_gateway.clone().unwrap_or_else(|| "N/A".to_string()),
-                        st.connection_start_time,
-                    )
-                };
+        ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("dashboard"),
+            egui::ViewportBuilder::default()
+                .with_title("DragonFox Status")
+                .with_inner_size([420.0, 340.0])
+                .with_resizable(false)
+                .with_maximize_button(false),
+            move |ctx, _class| {
+                ctx.set_visuals(egui::Visuals::dark());
 
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(0x25, 0x25, 0x26))
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(egui::Margin::same(12.0))
-                    .show(ui, |ui| {
-                        ui.vertical_centered(|ui| {
-                            ui.colored_label(
-                                state_color,
-                                egui::RichText::new(state_str.to_uppercase())
-                                    .size(18.0)
-                                    .strong(),
-                            );
-                        });
+                if ctx.input(|i| i.viewport().close_requested()) {
+                    *close_inner.lock().unwrap() = true;
+                }
+
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.colored_label(
+                            egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
+                            egui::RichText::new("DragonFox VPN").size(24.0).strong(),
+                        );
                     });
+                    ui.add_space(12.0);
 
-                ui.add_space(8.0);
-                ui.label(format!("Location: {location}"));
-                ui.label(format!("Gateway: {gateway}"));
+                    let (state_str, state_color, location, gateway, start_time) = {
+                        let st = state_arc.lock().unwrap();
+                        let cfg = config_arc.lock().unwrap();
+                        (
+                            st.vpn_state.as_str(),
+                            st.vpn_state.color(),
+                            st.vpn_location.clone(),
+                            cfg.vpn_gateway.clone().unwrap_or_else(|| "N/A".to_string()),
+                            st.connection_start_time,
+                        )
+                    };
 
-                let duration_str = if let Some(start) = start_time {
-                    let secs = start.elapsed().as_secs();
-                    format!(
-                        "{:02}:{:02}:{:02}",
-                        secs / 3600,
-                        (secs % 3600) / 60,
-                        secs % 60
-                    )
-                } else {
-                    "--:--:--".to_string()
-                };
-                ui.label(format!("Duration: {duration_str}"));
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_rgb(0x25, 0x25, 0x26))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(12.0))
+                        .show(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.colored_label(
+                                    state_color,
+                                    egui::RichText::new(state_str.to_uppercase())
+                                        .size(18.0)
+                                        .strong(),
+                                );
+                            });
+                        });
 
-                ui.add_space(8.0);
-                ui.vertical_centered(|ui| {
-                    if ui.button("Close").clicked() {
-                        self.show_dashboard = false;
-                    }
+                    ui.add_space(8.0);
+                    ui.label(format!("Location: {location}"));
+                    ui.label(format!("Gateway: {gateway}"));
+
+                    let duration_str = if let Some(start) = start_time {
+                        let secs = start.elapsed().as_secs();
+                        format!("{:02}:{:02}:{:02}", secs / 3600, (secs % 3600) / 60, secs % 60)
+                    } else {
+                        "--:--:--".to_string()
+                    };
+                    ui.label(format!("Duration: {duration_str}"));
+
+                    ui.add_space(8.0);
+                    ui.vertical_centered(|ui| {
+                        if ui.button("Close").clicked() {
+                            *close_inner.lock().unwrap() = true;
+                        }
+                    });
                 });
-            });
 
-        // Request repaint while dashboard is open so duration ticks
-        if self.show_dashboard {
-            ctx.request_repaint_after(Duration::from_secs(1));
-        }
+                // Tick every second so the duration counter updates.
+                ctx.request_repaint_after(Duration::from_secs(1));
+            },
+        );
 
-        if !open {
+        if *close.lock().unwrap() {
             self.show_dashboard = false;
         }
     }
@@ -1108,12 +1049,64 @@ impl DragonFoxApp {
             }
         }
     }
+
+}
+
+// --------------------------------------------------------------------------
+// Validation helper (called from the setup viewport closure)
+// --------------------------------------------------------------------------
+
+fn validate_and_save(ss: &mut SetupDialogState, config: &Arc<Mutex<AppConfig>>) {
+    let vpn_gw = ss.vpn_gateway.trim().to_string();
+    let isp_gw = ss.isp_gateway.trim().to_string();
+    let dns = ss.dns_server.trim().to_string();
+    let url = ss.switcher_url.trim().to_string();
+
+    if vpn_gw.is_empty() || isp_gw.is_empty() || dns.is_empty() || url.is_empty() {
+        ss.error_msg = Some("All fields are required.".to_string());
+        return;
+    }
+    if !is_valid_ip(&vpn_gw) || !is_valid_ip(&isp_gw) || !is_valid_ip(&dns) {
+        ss.error_msg = Some("Gateway and DNS fields must be valid IP addresses.".to_string());
+        return;
+    }
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        ss.error_msg = Some("Switcher URL must start with http:// or https://".to_string());
+        return;
+    }
+
+    if let Ok(mut cfg) = config.lock() {
+        cfg.vpn_gateway = Some(vpn_gw);
+        cfg.isp_gateway = Some(isp_gw);
+        cfg.dns_server = Some(dns);
+        cfg.switcher_url = Some(url);
+        cfg.setup_complete = true;
+        cfg.save();
+    }
+
+    ss.error_msg = None;
+    ss.submitted = true;
 }
 
 impl eframe::App for DragonFoxApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        // Pump GTK events so the tray icon and its menu receive updates.
+        // eframe uses a winit event loop, not GTK's, so we must do this manually.
+        #[cfg(target_os = "linux")]
+        {
+            while gtk::events_pending() {
+                gtk::main_iteration_do(false);
+            }
+        }
+
         // Apply dark visuals
         ctx.set_visuals(egui::Visuals::dark());
+
+        // The main viewport is a permanent 1×1 invisible anchor — it must never
+        // close unless the user chose Exit. Cancel any unexpected close events.
+        if ctx.input(|i| i.viewport().close_requested()) && !self.exiting {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+        }
 
         // Process background messages
         self.process_bg_messages(ctx);
@@ -1146,9 +1139,8 @@ impl eframe::App for DragonFoxApp {
                 let checked = self.menu_autostart.is_checked();
                 AutoStartManager::set_autostart(checked);
             } else if id == self.menu_settings.id() {
-                // Re-fill setup state from current config
                 if let Ok(cfg) = self.config.lock() {
-                    self.setup_state = SetupDialogState {
+                    *self.setup_state.lock().unwrap() = SetupDialogState {
                         vpn_gateway: cfg.vpn_gateway.clone().unwrap_or_default(),
                         isp_gateway: cfg.isp_gateway.clone().unwrap_or_default(),
                         dns_server: cfg.dns_server.clone().unwrap_or_default(),
@@ -1160,6 +1152,7 @@ impl eframe::App for DragonFoxApp {
                 }
                 self.show_setup_dialog = true;
             } else if id == self.menu_exit.id() {
+                self.exiting = true;
                 self.do_disable();
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
             }
@@ -1168,7 +1161,9 @@ impl eframe::App for DragonFoxApp {
         // Network check timer
         self.maybe_start_check(ctx);
 
-        // Render dialogs
+        // Each dialog lives in its own immediate viewport (a separate OS window).
+        // When a flag is false, show_viewport_immediate is not called and eframe
+        // closes that window automatically — no visibility commands needed.
         if self.show_setup_dialog {
             self.draw_setup_dialog(ctx);
         }
@@ -1179,13 +1174,9 @@ impl eframe::App for DragonFoxApp {
             self.draw_dashboard(ctx);
         }
 
-        // Request next repaint after 3 seconds for the network check timer,
-        // unless a dialog is showing (then repaint continuously)
-        if self.show_setup_dialog || self.show_location_dialog || self.show_dashboard {
-            ctx.request_repaint();
-        } else {
-            ctx.request_repaint_after(Duration::from_secs(3));
-        }
+        // Keep the 1×1 anchor ticking for the network-check timer.
+        // Dialog viewports repaint themselves internally.
+        ctx.request_repaint_after(Duration::from_secs(3));
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

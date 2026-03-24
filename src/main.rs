@@ -35,6 +35,7 @@ fn main() {
         viewport: egui::ViewportBuilder::default()
             .with_visible(false)
             .with_decorations(false)
+            .with_taskbar(false)
             .with_inner_size([1.0, 1.0])
             .with_title("DragonFoxVPN"),
         ..Default::default()
