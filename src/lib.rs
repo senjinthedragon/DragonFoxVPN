@@ -10,6 +10,7 @@
 pub mod api;
 pub mod app;
 pub mod autostart;
+pub mod daemon_ipc;
 pub mod config;
 pub mod icons;
 pub mod state;

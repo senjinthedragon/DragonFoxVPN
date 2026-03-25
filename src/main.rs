@@ -1,20 +1,22 @@
-// main.rs - DragonFoxVPN: Pure tray application entry point
+// main.rs - DragonFoxVPN: Tray daemon entry point and UI subprocess dispatcher
 // Copyright (c) 2026 Senjin the Dragon.
 // https://github.com/senjinthedragon/DragonFoxVPN
 // Licensed under the MIT License.
 // See LICENSE for full license information.
 //
-// The main() function runs entirely without a persistent eframe window.
-// The application lives in the system tray. Dialogs are opened on-demand
-// via eframe::run_native(), which blocks until the dialog is closed. A
-// background health_check_loop thread handles kill-switch logic
-// independently. VPN enable/disable operations are dispatched as threads
-// and update the shared AppState.
+// Architecture: a single long-running tray daemon process owns the GTK event
+// loop, the tray icon, the VPN state machine, and the health-check thread.
+// Dialog windows (Settings, Status, Location) are launched as independent
+// subprocesses via `--ui <mode>`. Each subprocess runs its own eframe event
+// loop in isolation — no shared Wayland connection, no GTK — so the OS close
+// button works reliably on every platform and compositor.
+//
+// IPC uses two JSON files in the config directory:
+//   daemon_status.json  — daemon writes, UI subprocesses read
+//   daemon_command.json — UI subprocesses write, daemon reads and acts on
 
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
-use std::collections::HashMap;
-use std::sync::{mpsc, Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use log::{error, info, warn};
@@ -23,28 +25,558 @@ use tray_icon::{
     TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
 
-use dragonfox_vpn::app::{DashboardDialog, FlagCache, LocationDialog, SetupDialog};
 use dragonfox_vpn::autostart::AutoStartManager;
 use dragonfox_vpn::config::AppConfig;
+use dragonfox_vpn::daemon_ipc::{
+    clear_daemon_command, current_unix_ts, save_daemon_status, take_daemon_command, DaemonCommand,
+    DaemonStatus,
+};
 use dragonfox_vpn::icons::{
     create_status_icon_rgba, COLOR_BLUE, COLOR_GRAY, COLOR_GREEN, COLOR_RED, COLOR_YELLOW,
 };
-use dragonfox_vpn::state::{AppState, VpnState};
+use dragonfox_vpn::state::VpnState;
 use dragonfox_vpn::system::SystemHandler;
 use dragonfox_vpn::vpn_runtime;
 
 // --------------------------------------------------------------------------
-// Dialog kind
+// Entry point
 // --------------------------------------------------------------------------
 
-enum DialogKind {
-    Setup { first_run: bool },
-    Dashboard,
-    Location,
+fn main() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_secs()
+        .init();
+
+    // UI subprocess mode: launched by the tray daemon for each dialog window.
+    // GTK is NOT initialised here — each subprocess has a clean eframe event
+    // loop with no competing Wayland connections, which is why close works.
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() >= 3 && args[1] == "--ui" {
+        match args[2].as_str() {
+            "settings" => dragonfox_vpn::app::run_settings_window(),
+            "status" => dragonfox_vpn::app::run_status_window(),
+            "location" => dragonfox_vpn::app::run_location_window(),
+            _ => {}
+        }
+        return;
+    }
+
+    // Tray daemon path.
+    #[cfg(target_os = "linux")]
+    {
+        if !gtk::is_initialized_main_thread() {
+            gtk::init().unwrap_or_else(|e| {
+                eprintln!("Failed to initialise GTK: {e}");
+                std::process::exit(1);
+            });
+        }
+    }
+
+    if !dragonfox_vpn::single_instance_check() {
+        warn!("Another instance of DragonFoxVPN is already running. Exiting.");
+        return;
+    }
+
+    run_tray_daemon();
 }
 
 // --------------------------------------------------------------------------
-// Menu item handles
+// Tray daemon
+// --------------------------------------------------------------------------
+
+fn run_tray_daemon() {
+    let mut config = AppConfig::load();
+    let adapter = SystemHandler::get_active_adapter();
+    info!("Active adapter: {adapter}");
+
+    let setup_complete = config.setup_complete;
+
+    // Persist initial status so UI subprocesses can display something
+    // immediately even before any VPN operation has occurred.
+    let mut daemon_status = DaemonStatus {
+        state: if setup_complete {
+            "Disabled".to_string()
+        } else {
+            "SetupIncomplete".to_string()
+        },
+        adapter: adapter.clone(),
+        location: config
+            .last_location
+            .clone()
+            .unwrap_or_else(|| "Unknown".to_string()),
+        vpn_gateway: config.vpn_gateway.clone(),
+        connected_since_unix: None,
+        message: None,
+        updated_unix: current_unix_ts(),
+    };
+    clear_daemon_command();
+    save_daemon_status(&daemon_status);
+
+    // Build tray icon and menu.
+    let (tray, items) = build_tray(&config);
+
+    // Health-check notification channel: background thread → main loop.
+    let (hc_tx, hc_rx) = std::sync::mpsc::channel::<HcEvent>();
+    {
+        let cfg_path = dragonfox_vpn::config::get_config_path();
+        let tx = hc_tx.clone();
+        std::thread::spawn(move || health_check_loop(cfg_path, tx));
+    }
+
+    // Track local VPN state for the daemon loop.
+    let mut vpn_state = VpnState::Disabled;
+    let mut connected_since: Option<Instant> = None;
+    update_tray_icon(&tray, &vpn_state);
+
+    // Auto-connect on startup if configured.
+    if setup_complete && config.auto_connect {
+        set_vpn_enabling(&tray, &items, &mut vpn_state, &mut daemon_status);
+        if do_enable_vpn(&adapter, &config) {
+            set_vpn_connected(
+                &tray,
+                &items,
+                &mut vpn_state,
+                &mut connected_since,
+                &mut daemon_status,
+                &config,
+                None,
+            );
+        } else {
+            set_vpn_failed(&tray, &items, &mut vpn_state, &mut daemon_status);
+        }
+    }
+
+    // Open settings on first run.
+    if !setup_complete {
+        spawn_ui("settings");
+    }
+
+    // -----------------------------------------------------------------------
+    // Main tray event loop
+    // -----------------------------------------------------------------------
+    loop {
+        // Service GTK so the tray icon menu stays responsive.
+        #[cfg(target_os = "linux")]
+        {
+            while gtk::events_pending() {
+                gtk::main_iteration_do(false);
+            }
+        }
+
+        // Process health-check events from background thread.
+        while let Ok(ev) = hc_rx.try_recv() {
+            handle_hc_event(
+                ev,
+                &tray,
+                &items,
+                &adapter,
+                &config,
+                &mut vpn_state,
+                &mut connected_since,
+                &mut daemon_status,
+            );
+        }
+
+        // Update connected_since timestamp in status ~every second.
+        if vpn_state == VpnState::Connected {
+            let ts = connected_since
+                .map(|s| current_unix_ts() - s.elapsed().as_secs())
+                .or(daemon_status.connected_since_unix);
+            if daemon_status.connected_since_unix != ts {
+                daemon_status.connected_since_unix = ts;
+                save_daemon_status(&daemon_status);
+            }
+        }
+
+        // Process daemon commands from UI subprocesses.
+        while let Some(cmd) = take_daemon_command() {
+            match cmd {
+                DaemonCommand::ReloadConfig => {
+                    config = AppConfig::load();
+                    daemon_status.vpn_gateway = config.vpn_gateway.clone();
+                    daemon_status.location = config
+                        .last_location
+                        .clone()
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    let setup_now = config.setup_complete;
+                    if setup_now {
+                        items.enable.set_enabled(
+                            vpn_state != VpnState::Connected && vpn_state != VpnState::Enabling,
+                        );
+                        items.location.set_enabled(true);
+                        items.settings.set_enabled(true);
+                        daemon_status.state = if vpn_state == VpnState::Disabled {
+                            "Disabled".to_string()
+                        } else {
+                            daemon_status.state.clone()
+                        };
+                    }
+                    save_daemon_status(&daemon_status);
+                    info!("Config reloaded from daemon command.");
+                }
+                DaemonCommand::Reconnect => {
+                    info!("Reconnect requested by UI subprocess.");
+                    if vpn_state == VpnState::Connected {
+                        do_disable_vpn(&adapter, &config);
+                    }
+                    config = AppConfig::load();
+                    set_vpn_enabling(&tray, &items, &mut vpn_state, &mut daemon_status);
+                    if do_enable_vpn(&adapter, &config) {
+                        set_vpn_connected(
+                            &tray,
+                            &items,
+                            &mut vpn_state,
+                            &mut connected_since,
+                            &mut daemon_status,
+                            &config,
+                            Some("Reconnected after location switch.".to_string()),
+                        );
+                    } else {
+                        set_vpn_failed(&tray, &items, &mut vpn_state, &mut daemon_status);
+                    }
+                }
+            }
+        }
+
+        // Poll tray icon events (double-click opens status).
+        while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
+            if ev.click_type == tray_icon::ClickType::Double {
+                spawn_ui("status");
+            }
+        }
+
+        // Poll menu events.
+        let mut should_exit = false;
+        while let Ok(ev) = MenuEvent::receiver().try_recv() {
+            handle_menu_event(
+                ev.id,
+                &items,
+                &tray,
+                &adapter,
+                &config,
+                &mut vpn_state,
+                &mut connected_since,
+                &mut daemon_status,
+                &mut should_exit,
+            );
+        }
+
+        if should_exit {
+            break;
+        }
+
+        std::thread::sleep(Duration::from_millis(10));
+    }
+
+    // Clean up on exit.
+    if vpn_state == VpnState::Connected {
+        do_disable_vpn(&adapter, &config);
+    }
+    drop(tray);
+}
+
+// --------------------------------------------------------------------------
+// VPN state helpers (update tray + daemon_status atomically)
+// --------------------------------------------------------------------------
+
+fn set_vpn_enabling(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    status: &mut DaemonStatus,
+) {
+    *vpn_state = VpnState::Enabling;
+    items.enable.set_enabled(false);
+    items.disable.set_enabled(false);
+    update_tray_icon(tray, vpn_state);
+    status.state = "Enabling".to_string();
+    status.message = Some("Connecting…".to_string());
+    save_daemon_status(status);
+}
+
+fn set_vpn_connected(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    status: &mut DaemonStatus,
+    config: &AppConfig,
+    message: Option<String>,
+) {
+    *vpn_state = VpnState::Connected;
+    *connected_since = Some(Instant::now());
+    items.enable.set_enabled(false);
+    items.disable.set_enabled(true);
+    update_tray_icon(tray, vpn_state);
+    status.state = "Connected".to_string();
+    status.connected_since_unix = Some(current_unix_ts());
+    status.location = config
+        .last_location
+        .clone()
+        .unwrap_or_else(|| "Unknown".to_string());
+    status.message = message;
+    save_daemon_status(status);
+}
+
+fn set_vpn_disabled(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    status: &mut DaemonStatus,
+) {
+    *vpn_state = VpnState::Disabled;
+    *connected_since = None;
+    items.enable.set_enabled(true);
+    items.disable.set_enabled(false);
+    update_tray_icon(tray, vpn_state);
+    status.state = "Disabled".to_string();
+    status.connected_since_unix = None;
+    status.message = None;
+    save_daemon_status(status);
+}
+
+fn set_vpn_failed(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    status: &mut DaemonStatus,
+) {
+    *vpn_state = VpnState::Disabled;
+    items.enable.set_enabled(true);
+    items.disable.set_enabled(false);
+    update_tray_icon(tray, vpn_state);
+    status.state = "Disabled".to_string();
+    status.connected_since_unix = None;
+    status.message = Some("Failed to enable VPN.".to_string());
+    save_daemon_status(status);
+}
+
+fn set_vpn_dropped(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    status: &mut DaemonStatus,
+    message: Option<String>,
+) {
+    *vpn_state = VpnState::Dropped;
+    *connected_since = None;
+    items.enable.set_enabled(true);
+    items.disable.set_enabled(false);
+    update_tray_icon(tray, vpn_state);
+    status.state = "Dropped".to_string();
+    status.connected_since_unix = None;
+    status.message = message;
+    save_daemon_status(status);
+}
+
+fn set_vpn_unreachable(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    status: &mut DaemonStatus,
+) {
+    *vpn_state = VpnState::ServerUnreachable;
+    *connected_since = None;
+    items.enable.set_enabled(true);
+    items.disable.set_enabled(false);
+    update_tray_icon(tray, vpn_state);
+    status.state = "ServerUnreachable".to_string();
+    status.connected_since_unix = None;
+    status.message = Some("VPN server unreachable.".to_string());
+    save_daemon_status(status);
+}
+
+// --------------------------------------------------------------------------
+// VPN operations (synchronous, called from the daemon loop)
+// --------------------------------------------------------------------------
+
+fn do_enable_vpn(adapter: &str, config: &AppConfig) -> bool {
+    let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
+    let dns = config.dns_server.clone().unwrap_or_default();
+    vpn_runtime::enable_vpn(adapter, &vpn_gw, &dns)
+}
+
+fn do_disable_vpn(adapter: &str, config: &AppConfig) {
+    let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
+    vpn_runtime::disable_vpn(adapter, &vpn_gw);
+}
+
+// --------------------------------------------------------------------------
+// Spawn a UI subprocess
+// --------------------------------------------------------------------------
+
+fn spawn_ui(mode: &str) {
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(exe)
+            .arg("--ui")
+            .arg(mode)
+            .spawn();
+    }
+}
+
+// --------------------------------------------------------------------------
+// Health-check background thread
+// --------------------------------------------------------------------------
+
+enum HcEvent {
+    Dropped { kill_switched: bool },
+    Unreachable,
+    Recovered,
+    Healthy,
+}
+
+fn health_check_loop(
+    _cfg_path: std::path::PathBuf,
+    tx: std::sync::mpsc::Sender<HcEvent>,
+) {
+    let mut drop_count: u32 = 0;
+
+    loop {
+        std::thread::sleep(Duration::from_secs(3));
+
+        // Read current status from disk so we don't need shared memory.
+        let status = match dragonfox_vpn::daemon_ipc::load_daemon_status() {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let should_check = matches!(
+            status.state.as_str(),
+            "Connected" | "Dropped" | "ServerUnreachable"
+        );
+        if !should_check {
+            drop_count = 0;
+            continue;
+        }
+
+        let config = AppConfig::load();
+        let adapter = status.adapter.clone();
+        let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
+        let isp_gw = config.isp_gateway.clone().unwrap_or_default();
+
+        let result = vpn_runtime::check_health(&adapter, &vpn_gw, &isp_gw);
+
+        if result.vpn_active && result.route_exists {
+            drop_count = 0;
+            if status.state != "Connected" {
+                let _ = tx.send(HcEvent::Recovered);
+            } else {
+                let _ = tx.send(HcEvent::Healthy);
+            }
+        } else if !result.vpn_active && result.route_exists {
+            drop_count += 1;
+            if drop_count >= 2 {
+                warn!("VPN dropped after {drop_count} checks — triggering kill switch.");
+                SystemHandler::kill_switch_delete_route(&vpn_gw, &adapter);
+                SystemHandler::flush_dns();
+                drop_count = 0;
+                let _ = tx.send(HcEvent::Dropped { kill_switched: true });
+            }
+        } else if !result.route_exists {
+            drop_count = 0;
+            if result.pi_reachable {
+                let _ = tx.send(HcEvent::Dropped { kill_switched: false });
+            } else {
+                let _ = tx.send(HcEvent::Unreachable);
+            }
+        }
+    }
+}
+
+fn handle_hc_event(
+    ev: HcEvent,
+    tray: &TrayIcon,
+    items: &MenuItems,
+    _adapter: &str,
+    _config: &AppConfig,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    status: &mut DaemonStatus,
+) {
+    match ev {
+        HcEvent::Healthy => {}
+        HcEvent::Recovered => {
+            if *vpn_state != VpnState::Connected {
+                *vpn_state = VpnState::Connected;
+                if connected_since.is_none() {
+                    *connected_since = Some(Instant::now());
+                    status.connected_since_unix = Some(current_unix_ts());
+                }
+                items.enable.set_enabled(false);
+                items.disable.set_enabled(true);
+                update_tray_icon(tray, vpn_state);
+                status.state = "Connected".to_string();
+                status.message = None;
+                save_daemon_status(status);
+                info!("VPN recovered.");
+            }
+        }
+        HcEvent::Dropped { kill_switched } => {
+            let msg = if kill_switched {
+                "Kill switch activated — routing cleared."
+            } else {
+                "VPN route lost unexpectedly."
+            };
+            set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg.to_string()));
+            error!("{msg}");
+        }
+        HcEvent::Unreachable => {
+            if *vpn_state != VpnState::ServerUnreachable {
+                set_vpn_unreachable(tray, items, vpn_state, connected_since, status);
+                warn!("VPN server unreachable.");
+            }
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
+// Menu event dispatch
+// --------------------------------------------------------------------------
+
+#[allow(clippy::too_many_arguments)]
+fn handle_menu_event(
+    id: tray_icon::menu::MenuId,
+    items: &MenuItems,
+    tray: &TrayIcon,
+    adapter: &str,
+    config: &AppConfig,
+    vpn_state: &mut VpnState,
+    connected_since: &mut Option<Instant>,
+    daemon_status: &mut DaemonStatus,
+    should_exit: &mut bool,
+) {
+    if id == items.dashboard.id() {
+        spawn_ui("status");
+    } else if id == items.enable.id() {
+        set_vpn_enabling(tray, items, vpn_state, daemon_status);
+        if do_enable_vpn(adapter, config) {
+            set_vpn_connected(tray, items, vpn_state, connected_since, daemon_status, config, None);
+        } else {
+            set_vpn_failed(tray, items, vpn_state, daemon_status);
+        }
+    } else if id == items.disable.id() {
+        do_disable_vpn(adapter, config);
+        set_vpn_disabled(tray, items, vpn_state, connected_since, daemon_status);
+    } else if id == items.location.id() {
+        spawn_ui("location");
+    } else if id == items.autoconnect.id() {
+        let mut cfg = AppConfig::load();
+        cfg.auto_connect = items.autoconnect.is_checked();
+        cfg.save();
+    } else if id == items.autostart.id() {
+        AutoStartManager::set_autostart(items.autostart.is_checked());
+    } else if id == items.settings.id() {
+        spawn_ui("settings");
+    } else if id == items.exit.id() {
+        *should_exit = true;
+    }
+}
+
+// --------------------------------------------------------------------------
+// Tray construction
 // --------------------------------------------------------------------------
 
 struct MenuItems {
@@ -58,174 +590,12 @@ struct MenuItems {
     exit: MenuItem,
 }
 
-// --------------------------------------------------------------------------
-// main()
-// --------------------------------------------------------------------------
-
-fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_secs()
-        .init();
-
-    #[cfg(target_os = "linux")]
-    {
-        if !gtk::is_initialized_main_thread() {
-            gtk::init().unwrap_or_else(|e| {
-                eprintln!("Failed to initialize GTK: {e}");
-                std::process::exit(1);
-            });
-        }
-    }
-
-    if !dragonfox_vpn::single_instance_check() {
-        warn!("Another instance of DragonFoxVPN is already running. Exiting.");
-        return;
-    }
-
-    // Load config and state.
-    let config = Arc::new(Mutex::new(AppConfig::load()));
-    let state = Arc::new(Mutex::new(AppState::default()));
-    let flag_cache: FlagCache = Arc::new(Mutex::new(HashMap::new()));
-
-    // Detect active network adapter.
-    {
-        let adapter = SystemHandler::get_active_adapter();
-        info!("Active adapter: {adapter}");
-        state.lock().unwrap().adapter_name = adapter;
-    }
-
-    // Restore last known location from config.
-    {
-        if let (Ok(mut st), Ok(cfg)) = (state.lock(), config.lock()) {
-            if let Some(loc) = &cfg.last_location {
-                st.vpn_location = loc.clone();
-            }
-        }
-    }
-
-    // Health check notification channel (main thread drains this to know when to refresh tray).
-    let (hc_tx, hc_rx) = mpsc::channel::<()>();
-
-    // Spawn health check background thread.
-    {
-        let s = Arc::clone(&state);
-        let c = Arc::clone(&config);
-        let tx = hc_tx.clone();
-        std::thread::spawn(move || health_check_loop(s, c, tx));
-    }
-
-    // Build tray icon and menu.
-    let (tray, items) = build_tray(&config.lock().unwrap());
-
-    // Determine initial dialog.
-    let first_run = !config.lock().unwrap().setup_complete;
-    let mut pending_dialog: Option<DialogKind> = if first_run {
-        Some(DialogKind::Setup { first_run: true })
-    } else {
-        None
-    };
-
-    // Auto-connect if configured and not first run.
-    if !first_run && config.lock().unwrap().auto_connect {
-        do_enable_vpn(Arc::clone(&state), Arc::clone(&config));
-    }
-
-    // Track tray icon state to avoid redundant updates.
-    let mut last_tray_state = VpnState::Disabled;
-    update_tray_icon(&tray, &VpnState::Disabled);
-
-    // --------------------------------------------------------------------------
-    // Main event loop
-    // --------------------------------------------------------------------------
-    loop {
-        // Pump GTK events so tray menus stay responsive between dialogs.
-        #[cfg(target_os = "linux")]
-        {
-            while gtk::events_pending() {
-                gtk::main_iteration_do(false);
-            }
-        }
-
-        // Drain health-check pings (actual state is in the shared AppState).
-        while hc_rx.try_recv().is_ok() {}
-
-        // Update tray icon if VPN state changed.
-        let current_state = state.lock().unwrap().vpn_state.clone();
-        if current_state != last_tray_state {
-            update_tray_icon(&tray, &current_state);
-            update_menu_enabled(&items, &current_state);
-            last_tray_state = current_state;
-        }
-
-        // Poll tray icon events (double-click → Dashboard).
-        while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
-            if ev.click_type == tray_icon::ClickType::Double {
-                pending_dialog = Some(DialogKind::Dashboard);
-            }
-        }
-
-        // Poll menu events.
-        let mut should_exit = false;
-        while let Ok(ev) = MenuEvent::receiver().try_recv() {
-            handle_menu_event(
-                ev.id,
-                &items,
-                &state,
-                &config,
-                &tray,
-                &mut last_tray_state,
-                &mut pending_dialog,
-                &mut should_exit,
-            );
-        }
-
-        if should_exit {
-            break;
-        }
-
-        // Open pending dialog. eframe::run_native blocks until the dialog closes.
-        if let Some(kind) = pending_dialog.take() {
-            let setup_was_incomplete = !config.lock().unwrap().setup_complete;
-
-            run_dialog(kind, Arc::clone(&state), Arc::clone(&config), Arc::clone(&flag_cache));
-
-            // After Setup dialog closes, refresh adapter if setup just completed.
-            if setup_was_incomplete && config.lock().unwrap().setup_complete {
-                let adapter = SystemHandler::get_active_adapter();
-                state.lock().unwrap().adapter_name = adapter;
-                items.enable.set_enabled(true);
-                items.location.set_enabled(true);
-            }
-        }
-
-        std::thread::sleep(Duration::from_millis(10));
-    }
-
-    // Clean exit: disable VPN and drop tray.
-    {
-        let (adapter, vpn_gw) = {
-            let st = state.lock().unwrap();
-            let cfg = config.lock().unwrap();
-            (
-                st.adapter_name.clone(),
-                cfg.vpn_gateway.clone().unwrap_or_default(),
-            )
-        };
-        vpn_runtime::disable_vpn(&adapter, &vpn_gw);
-    }
-    drop(tray);
-}
-
-// --------------------------------------------------------------------------
-// Tray construction
-// --------------------------------------------------------------------------
-
 fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let menu = Menu::new();
 
+    let setup_complete = config.setup_complete;
     let dashboard = MenuItem::new("Status Dashboard", true, None);
     let sep1 = PredefinedMenuItem::separator();
-    let setup_complete = config.setup_complete;
     let enable = MenuItem::new("Enable VPN", setup_complete, None);
     let disable = MenuItem::new("Disable VPN", false, None);
     let sep2 = PredefinedMenuItem::separator();
@@ -233,9 +603,8 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let autoconnect =
         CheckMenuItem::new("Auto-Connect on Start", true, config.auto_connect, None);
     let autostart_avail = AutoStartManager::is_available();
-    let autostart_checked = AutoStartManager::is_enabled();
     let autostart = if autostart_avail {
-        CheckMenuItem::new("Run on Startup", true, autostart_checked, None)
+        CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None)
     } else {
         CheckMenuItem::new("Run on Startup (Windows only)", false, false, None)
     };
@@ -270,12 +639,21 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         .build()
         .expect("Failed to create tray icon");
 
-    let items = MenuItems { dashboard, enable, disable, location, autoconnect, autostart, settings, exit };
+    let items = MenuItems {
+        dashboard,
+        enable,
+        disable,
+        location,
+        autoconnect,
+        autostart,
+        settings,
+        exit,
+    };
     (tray, items)
 }
 
 // --------------------------------------------------------------------------
-// Tray icon update
+// Tray icon colour
 // --------------------------------------------------------------------------
 
 fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState) {
@@ -290,7 +668,7 @@ fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState) {
         VpnState::Connected => "DragonFoxVPN: Connected",
         VpnState::Dropped => "DragonFoxVPN: Connection Dropped",
         VpnState::ServerUnreachable => "DragonFoxVPN: Server Unreachable",
-        VpnState::Enabling => "DragonFoxVPN: Connecting...",
+        VpnState::Enabling => "DragonFoxVPN: Connecting…",
         VpnState::Disabled => "DragonFoxVPN: Disabled",
     };
     let rgba = create_status_icon_rgba(color);
@@ -298,280 +676,4 @@ fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState) {
         let _ = tray.set_icon(Some(icon));
     }
     let _ = tray.set_tooltip(Some(tooltip));
-}
-
-fn update_menu_enabled(items: &MenuItems, vpn_state: &VpnState) {
-    let connected = *vpn_state == VpnState::Connected;
-    items.enable.set_enabled(!connected);
-    items.disable.set_enabled(connected);
-}
-
-
-// --------------------------------------------------------------------------
-// Menu event dispatch
-// --------------------------------------------------------------------------
-
-#[allow(clippy::too_many_arguments)]
-fn handle_menu_event(
-    id: tray_icon::menu::MenuId,
-    items: &MenuItems,
-    state: &Arc<Mutex<AppState>>,
-    config: &Arc<Mutex<AppConfig>>,
-    tray: &TrayIcon,
-    last_tray_state: &mut VpnState,
-    pending_dialog: &mut Option<DialogKind>,
-    should_exit: &mut bool,
-) {
-    if id == items.dashboard.id() {
-        *pending_dialog = Some(DialogKind::Dashboard);
-    } else if id == items.enable.id() {
-        do_enable_vpn(Arc::clone(state), Arc::clone(config));
-    } else if id == items.disable.id() {
-        do_disable_vpn(Arc::clone(state), Arc::clone(config));
-    } else if id == items.location.id() {
-        *pending_dialog = Some(DialogKind::Location);
-    } else if id == items.autoconnect.id() {
-        let checked = items.autoconnect.is_checked();
-        if let Ok(mut cfg) = config.lock() {
-            cfg.auto_connect = checked;
-            cfg.save();
-        }
-    } else if id == items.autostart.id() {
-        let checked = items.autostart.is_checked();
-        AutoStartManager::set_autostart(checked);
-    } else if id == items.settings.id() {
-        *pending_dialog = Some(DialogKind::Setup { first_run: false });
-    } else if id == items.exit.id() {
-        *should_exit = true;
-        // Disable VPN synchronously on exit.
-        let (adapter, vpn_gw) = {
-            let st = state.lock().unwrap();
-            let cfg = config.lock().unwrap();
-            (
-                st.adapter_name.clone(),
-                cfg.vpn_gateway.clone().unwrap_or_default(),
-            )
-        };
-        vpn_runtime::disable_vpn(&adapter, &vpn_gw);
-    }
-
-    let _ = (tray, last_tray_state); // suppress unused warnings
-}
-
-// --------------------------------------------------------------------------
-// run_dialog: open a dialog via eframe::run_native (blocks until closed)
-// --------------------------------------------------------------------------
-
-fn run_dialog(
-    kind: DialogKind,
-    state: Arc<Mutex<AppState>>,
-    config: Arc<Mutex<AppConfig>>,
-    flag_cache: FlagCache,
-) {
-    let (title, width, height, resizable) = match &kind {
-        DialogKind::Setup { first_run } => (
-            if *first_run { "DragonFoxVPN — Initial Setup" } else { "DragonFoxVPN — Settings" },
-            500.0_f32,
-            360.0_f32,
-            false,
-        ),
-        DialogKind::Dashboard => ("DragonFoxVPN — Status", 420.0, 300.0, false),
-        DialogKind::Location => ("DragonFoxVPN — Change Location", 620.0, 700.0, true),
-    };
-
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_title(title)
-            .with_inner_size([width, height])
-            .with_resizable(resizable),
-        // vsync blocks eglSwapBuffers waiting for the KDE/Wayland compositor,
-        // which stalls the winit event loop and prevents close events from
-        // being processed. Disabling it keeps the event loop responsive.
-        vsync: false,
-        ..Default::default()
-    };
-
-    let _ = eframe::run_native(
-        "DragonFoxVPN",
-        options,
-        Box::new(move |_cc| {
-            Ok(match kind {
-                DialogKind::Setup { first_run } => {
-                    Box::new(SetupDialog::new(config, first_run)) as Box<dyn eframe::App>
-                }
-                DialogKind::Dashboard => {
-                    Box::new(DashboardDialog::new(state, config)) as Box<dyn eframe::App>
-                }
-                DialogKind::Location => {
-                    Box::new(LocationDialog::new(state, config, flag_cache)) as Box<dyn eframe::App>
-                }
-            })
-        }),
-    );
-}
-
-// --------------------------------------------------------------------------
-// VPN enable / disable (spawn threads, update shared state)
-// --------------------------------------------------------------------------
-
-fn do_enable_vpn(state: Arc<Mutex<AppState>>, config: Arc<Mutex<AppConfig>>) {
-    // Immediately mark as Enabling so the tray updates without waiting for the thread.
-    if let Ok(mut st) = state.lock() {
-        st.vpn_state = VpnState::Enabling;
-        st.manual_disable = false;
-    }
-
-    std::thread::spawn(move || {
-        let (adapter, vpn_gw, dns) = {
-            let st = state.lock().unwrap();
-            let cfg = config.lock().unwrap();
-            (
-                st.adapter_name.clone(),
-                cfg.vpn_gateway.clone().unwrap_or_default(),
-                cfg.dns_server.clone().unwrap_or_default(),
-            )
-        };
-
-        let success = vpn_runtime::enable_vpn(&adapter, &vpn_gw, &dns);
-
-        if let Ok(mut st) = state.lock() {
-            if success {
-                st.vpn_state = VpnState::Connected;
-                st.connection_start_time = Some(Instant::now());
-                info!("VPN enabled successfully.");
-            } else {
-                error!("Failed to enable VPN routing.");
-                st.vpn_state = VpnState::Disabled;
-                st.manual_disable = true;
-            }
-        }
-    });
-}
-
-fn do_disable_vpn(state: Arc<Mutex<AppState>>, config: Arc<Mutex<AppConfig>>) {
-    std::thread::spawn(move || {
-        let (adapter, vpn_gw) = {
-            let st = state.lock().unwrap();
-            let cfg = config.lock().unwrap();
-            (
-                st.adapter_name.clone(),
-                cfg.vpn_gateway.clone().unwrap_or_default(),
-            )
-        };
-
-        vpn_runtime::disable_vpn(&adapter, &vpn_gw);
-
-        if let Ok(mut st) = state.lock() {
-            st.vpn_state = VpnState::Disabled;
-            st.connection_start_time = None;
-            st.manual_disable = true;
-            info!("VPN disabled.");
-        }
-    });
-}
-
-// --------------------------------------------------------------------------
-// Health check loop (independent background thread)
-// --------------------------------------------------------------------------
-
-fn health_check_loop(
-    state: Arc<Mutex<AppState>>,
-    config: Arc<Mutex<AppConfig>>,
-    tx: mpsc::Sender<()>,
-) {
-    let mut drop_count: u32 = 0;
-
-    loop {
-        std::thread::sleep(Duration::from_secs(3));
-
-        // Only check when connected or unreachable.
-        let current_vpn_state = state.lock().unwrap().vpn_state.clone();
-        let setup_complete = config.lock().unwrap().setup_complete;
-
-        if !setup_complete {
-            continue;
-        }
-
-        let should_check = matches!(
-            current_vpn_state,
-            VpnState::Connected | VpnState::ServerUnreachable | VpnState::Dropped
-        );
-        if !should_check {
-            drop_count = 0;
-            continue;
-        }
-
-        let (adapter, vpn_gw, isp_gw) = {
-            let st = state.lock().unwrap();
-            let cfg = config.lock().unwrap();
-            (
-                st.adapter_name.clone(),
-                cfg.vpn_gateway.clone().unwrap_or_default(),
-                cfg.isp_gateway.clone().unwrap_or_default(),
-            )
-        };
-
-        let result = vpn_runtime::check_health(&adapter, &vpn_gw, &isp_gw);
-        let manual_disable = state.lock().unwrap().manual_disable;
-
-        if result.vpn_active && result.route_exists {
-            // Connection healthy.
-            drop_count = 0;
-            if let Ok(mut st) = state.lock() {
-                if st.vpn_state != VpnState::Connected {
-                    st.vpn_state = VpnState::Connected;
-                    if st.connection_start_time.is_none() {
-                        st.connection_start_time = Some(Instant::now());
-                    }
-                }
-            }
-        } else if !result.vpn_active && result.route_exists && !manual_disable {
-            // Route is up but traffic isn't flowing through VPN.
-            drop_count += 1;
-            if drop_count >= 2 {
-                warn!("VPN connection dropped after {drop_count} checks. Triggering kill switch.");
-                SystemHandler::kill_switch_delete_route(&vpn_gw, &adapter);
-                SystemHandler::flush_dns();
-                if let Ok(mut st) = state.lock() {
-                    st.vpn_state = VpnState::Dropped;
-                    st.connection_start_time = None;
-                }
-                drop_count = 0;
-            } else {
-                if let Ok(mut st) = state.lock() {
-                    if st.vpn_state == VpnState::Connected {
-                        st.vpn_state = VpnState::Dropped;
-                    }
-                }
-            }
-        } else if !result.route_exists {
-            // No route at all.
-            drop_count = 0;
-            let vpn_state_now = state.lock().unwrap().vpn_state.clone();
-            if vpn_state_now == VpnState::Connected || vpn_state_now == VpnState::Dropped {
-                // Route vanished unexpectedly.
-                if !manual_disable {
-                    if !result.pi_reachable {
-                        if let Ok(mut st) = state.lock() {
-                            st.vpn_state = VpnState::ServerUnreachable;
-                        }
-                    } else {
-                        if let Ok(mut st) = state.lock() {
-                            st.vpn_state = VpnState::Dropped;
-                        }
-                    }
-                }
-            } else if vpn_state_now == VpnState::ServerUnreachable {
-                if result.pi_reachable {
-                    info!("VPN server reachable again.");
-                    if let Ok(mut st) = state.lock() {
-                        st.vpn_state = VpnState::Disabled;
-                    }
-                }
-            }
-        }
-
-        // Notify main loop that state may have changed.
-        let _ = tx.send(());
-    }
 }
