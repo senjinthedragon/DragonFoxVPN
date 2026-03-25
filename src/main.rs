@@ -123,6 +123,17 @@ fn run_tray_daemon() {
         std::thread::spawn(move || health_check_loop(cfg_path, tx));
     }
 
+    // Fetch the actual current location from the backend on startup so the
+    // status reflects what the Pi is set to, not just what the app last saved.
+    if let Some(url) = config.switcher_url.clone() {
+        let tx = hc_tx.clone();
+        std::thread::spawn(move || {
+            if let Ok((_, Some(label))) = dragonfox_vpn::api::VpnApi::fetch_locations(&url) {
+                let _ = tx.send(HcEvent::LocationFetched(label));
+            }
+        });
+    }
+
     // Track local VPN state for the daemon loop.
     let mut vpn_state = VpnState::Disabled;
     let mut connected_since: Option<Instant> = None;
@@ -473,6 +484,7 @@ enum HcEvent {
     Unreachable,
     Recovered,
     Healthy,
+    LocationFetched(String),
 }
 
 fn health_check_loop(
@@ -545,6 +557,11 @@ fn handle_hc_event(
 ) {
     match ev {
         HcEvent::Healthy => {}
+        HcEvent::LocationFetched(label) => {
+            status.location = label.clone();
+            save_daemon_status(status);
+            info!("Startup location sync from backend: {label}");
+        }
         HcEvent::Recovered => {
             if *vpn_state != VpnState::Connected {
                 *vpn_state = VpnState::Connected;
