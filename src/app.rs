@@ -322,7 +322,9 @@ impl eframe::App for SettingsWindow {
 
 impl SettingsWindow {
     fn start_test(&mut self) {
-        let url = self.switcher_url.trim().to_string();
+        let url = self.switcher_url.trim().trim_end_matches('/').to_string();
+        // Update the field so the user sees the normalised URL.
+        self.switcher_url = url.clone();
         let vpn_ip = self.vpn_gateway.to_ip_string();
         let router_ip = self.isp_gateway.to_ip_string();
 
@@ -336,7 +338,7 @@ impl SettingsWindow {
     }
 
     fn try_save(&mut self, ctx: &egui::Context) {
-        let url = self.switcher_url.trim().to_string();
+        let url = self.switcher_url.trim().trim_end_matches('/').to_string();
 
         if !self.vpn_gateway.is_valid() || !self.isp_gateway.is_valid() {
             self.message =
