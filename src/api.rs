@@ -83,7 +83,7 @@ impl VpnApi {
                     let status = response.status();
                     log::info!("switch_location: HTTP {status}");
 
-                    // With redirects(0), ureq returns 3xx as Ok — handle manually.
+                    // With redirects(0), ureq returns 3xx as Ok - handle manually.
                     if (301..=308).contains(&status) {
                         match response.header("location") {
                             Some(loc) => {
@@ -153,7 +153,7 @@ fn resolve_redirect(current: &str, location: &str) -> String {
     if location.starts_with("http://") || location.starts_with("https://") {
         location.to_string()
     } else if location.starts_with('/') {
-        // Absolute path — keep scheme+host from current URL.
+        // Absolute path - keep scheme+host from current URL.
         if let Some(idx) = current.find("://") {
             let rest = &current[idx + 3..];
             let host_end = rest.find('/').unwrap_or(rest.len());

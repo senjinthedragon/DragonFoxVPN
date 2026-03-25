@@ -39,9 +39,9 @@ pub struct DaemonStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DaemonCommand {
-    /// UI saved new settings — daemon should reload AppConfig.
+    /// UI saved new settings - daemon should reload AppConfig.
     ReloadConfig,
-    /// UI switched VPN location while connected — daemon should reconnect.
+    /// UI switched VPN location while connected - daemon should reconnect.
     Reconnect,
 }
 

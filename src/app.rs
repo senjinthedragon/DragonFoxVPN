@@ -89,9 +89,9 @@ pub fn run_settings_window() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(if first_run {
-                "DragonFoxVPN — Initial Setup"
+                "DragonFoxVPN - Initial Setup"
             } else {
-                "DragonFoxVPN — Settings"
+                "DragonFoxVPN - Settings"
             })
             .with_inner_size([500.0, 360.0])
             .with_resizable(false),
@@ -114,7 +114,7 @@ pub fn run_status_window() {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DragonFoxVPN — Status")
+            .with_title("DragonFoxVPN - Status")
             .with_inner_size([420.0, 300.0])
             .with_resizable(false),
         ..Default::default()
@@ -136,7 +136,7 @@ pub fn run_location_window() {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DragonFoxVPN — Change Location")
+            .with_title("DragonFoxVPN - Change Location")
             .with_inner_size([620.0, 700.0])
             .with_resizable(true),
         ..Default::default()
@@ -461,7 +461,7 @@ impl LocationWindow {
         if self.flag_textures.contains_key(iso_code) || self.fetching_flags.contains(iso_code) {
             return;
         }
-        // Already have the bytes in memory — upload texture immediately.
+        // Already have the bytes in memory - upload texture immediately.
         if let Some(bytes) = self.flag_bytes.get(iso_code).cloned() {
             self.upload_flag_texture(iso_code, &bytes, ctx);
             return;

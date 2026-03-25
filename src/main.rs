@@ -8,12 +8,12 @@
 // loop, the tray icon, the VPN state machine, and the health-check thread.
 // Dialog windows (Settings, Status, Location) are launched as independent
 // subprocesses via `--ui <mode>`. Each subprocess runs its own eframe event
-// loop in isolation — no shared Wayland connection, no GTK — so the OS close
+// loop in isolation - no shared Wayland connection, no GTK - so the OS close
 // button works reliably on every platform and compositor.
 //
 // IPC uses two JSON files in the config directory:
-//   daemon_status.json  — daemon writes, UI subprocesses read
-//   daemon_command.json — UI subprocesses write, daemon reads and acts on
+//   daemon_status.json  - daemon writes, UI subprocesses read
+//   daemon_command.json - UI subprocesses write, daemon reads and acts on
 
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
@@ -48,7 +48,7 @@ fn main() {
         .init();
 
     // UI subprocess mode: launched by the tray daemon for each dialog window.
-    // GTK is NOT initialised here — each subprocess has a clean eframe event
+    // GTK is NOT initialised here - each subprocess has a clean eframe event
     // loop with no competing Wayland connections, which is why close works.
     let args: Vec<String> = std::env::args().collect();
     if args.len() >= 3 && args[1] == "--ui" {
@@ -179,7 +179,7 @@ fn run_tray_daemon() {
         // Modal behaviour: while a dialog is open, replace the tray menu with
         // a locked placeholder so right-click shows nothing actionable.
         // libappindicator on Linux always shows a menu on right-click and
-        // cannot suppress it, so set_menu(None) has no effect — swapping to a
+        // cannot suppress it, so set_menu(None) has no effect - swapping to a
         // disabled placeholder is the only reliable way to block interaction.
         let dialog_open = any_ui_open();
         if dialog_open != dialog_was_open {
@@ -528,7 +528,7 @@ fn health_check_loop(
         } else if !result.vpn_active && result.route_exists {
             drop_count += 1;
             if drop_count >= 2 {
-                warn!("VPN dropped after {drop_count} checks — triggering kill switch.");
+                warn!("VPN dropped after {drop_count} checks - triggering kill switch.");
                 SystemHandler::kill_switch_delete_route(&vpn_gw, &adapter);
                 SystemHandler::flush_dns();
                 drop_count = 0;
@@ -580,7 +580,7 @@ fn handle_hc_event(
         }
         HcEvent::Dropped { kill_switched } => {
             let msg = if kill_switched {
-                "Kill switch activated — routing cleared."
+                "Kill switch activated - routing cleared."
             } else {
                 "VPN route lost unexpectedly."
             };
