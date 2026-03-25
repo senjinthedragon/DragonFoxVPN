@@ -822,19 +822,31 @@ impl IpInput {
         let base_id = egui::Id::new(id_salt);
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 2.0;
+
+            // Collect which field should receive focus after all fields are
+            // rendered. Advancing focus mid-loop causes the dot event to
+            // propagate into the next field's TextEdit in the same frame,
+            // which then advances again — skipping all the way to the last box.
+            let mut focus_next: Option<usize> = None;
+
             for i in 0..4usize {
                 let field_id = base_id.with(i);
                 let prev_len = self.octets[i].len();
+
+                // Snapshot focus state BEFORE rendering so subsequent fields
+                // that haven't been focused yet don't falsely trigger.
+                let had_focus = ui.memory(|m| m.has_focus(field_id));
 
                 ui.add(
                     egui::TextEdit::singleline(&mut self.octets[i])
                         .id(field_id)
                         .desired_width(30.0)
-                        .char_limit(4), // allow 4 briefly so we can detect the dot
+                        .char_limit(4),
                 );
 
                 // If the user typed a '.' advance to the next octet.
-                let has_dot = self.octets[i].contains('.');
+                // Gate on had_focus so only the active field triggers this.
+                let has_dot = had_focus && self.octets[i].contains('.');
                 // Keep only digits and cap at 3 chars.
                 self.octets[i].retain(|c| c.is_ascii_digit());
                 if self.octets[i].len() > 3 {
@@ -843,13 +855,18 @@ impl IpInput {
 
                 // Auto-advance when the field just became 3 digits, or on dot.
                 let just_filled = self.octets[i].len() == 3 && prev_len < 3;
-                if (just_filled || has_dot) && i < 3 {
-                    ui.memory_mut(|m| m.request_focus(base_id.with(i + 1)));
+                if (just_filled || has_dot) && i < 3 && focus_next.is_none() {
+                    focus_next = Some(i + 1);
                 }
 
                 if i < 3 {
                     ui.label(".");
                 }
+            }
+
+            // Apply the focus change after all fields are rendered.
+            if let Some(next) = focus_next {
+                ui.memory_mut(|m| m.request_focus(base_id.with(next)));
             }
         });
     }
