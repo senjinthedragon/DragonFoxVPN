@@ -317,6 +317,20 @@ fn run_tray_daemon() {
                             daemon_status.state.clone()
                         };
                     }
+                    // If location is still unknown and we now have a URL,
+                    // fetch the current location from the backend.
+                    if config.last_location.is_none() {
+                        if let Some(url) = config.switcher_url.clone() {
+                            let tx = hc_tx.clone();
+                            std::thread::spawn(move || {
+                                if let Ok((_, Some(label))) =
+                                    dragonfox_vpn::api::VpnApi::fetch_locations(&url)
+                                {
+                                    let _ = tx.send(HcEvent::LocationFetched(label));
+                                }
+                            });
+                        }
+                    }
                     save_daemon_status(&daemon_status);
                     info!("Config reloaded from daemon command.");
                 }
