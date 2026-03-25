@@ -1,11 +1,10 @@
-// state.rs - DragonFoxVPN: Global application state
+// state.rs - DragonFoxVPN: VPN state machine and legacy app state
 // Copyright (c) 2026 Senjin the Dragon.
 // https://github.com/senjinthedragon/DragonFoxVPN
 // Licensed under the MIT License.
 // See LICENSE for full license information.
 //
-// Defines the VPN connection state machine and the shared AppState struct
-// that is passed between the UI thread and background monitor via Arc<Mutex<>>.
+// VpnState is used by the tray daemon. AppState is kept for test compatibility.
 
 use std::time::Instant;
 
@@ -62,10 +61,3 @@ impl Default for AppState {
     }
 }
 
-/// Result from the background network monitor thread.
-#[derive(Debug, Clone)]
-pub struct NetworkCheckResult {
-    pub vpn_active: bool,
-    pub route_exists: bool,
-    pub pi_reachable: bool,
-}
