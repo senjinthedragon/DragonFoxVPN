@@ -185,8 +185,7 @@ fn run_tray_daemon() {
         if dialog_open != dialog_was_open {
             if dialog_open {
                 items.dashboard.set_enabled(false);
-                items.enable.set_enabled(false);
-                items.disable.set_enabled(false);
+                items.toggle.set_enabled(false);
                 items.location.set_enabled(false);
                 items.autoconnect.set_enabled(false);
                 items.autostart.set_enabled(false);
@@ -200,9 +199,12 @@ fn run_tray_daemon() {
                 items.autoconnect.set_enabled(true);
                 items.autostart.set_enabled(AutoStartManager::is_available());
                 let setup_done = config.setup_complete;
-                items.enable.set_enabled(
-                    setup_done && vpn_state != VpnState::Connected && vpn_state != VpnState::Enabling,
-                );
+                items.toggle.set_text(if vpn_state == VpnState::Connected {
+                    "Disable VPN"
+                } else {
+                    "Enable VPN"
+                });
+                items.toggle.set_enabled(setup_done && vpn_state != VpnState::Enabling);
                 items.location.set_enabled(setup_done);
             }
             dialog_was_open = dialog_open;
@@ -245,8 +247,13 @@ fn run_tray_daemon() {
                         .unwrap_or_else(|| "Unknown".to_string());
                     let setup_now = config.setup_complete;
                     if setup_now {
-                        items.enable.set_enabled(
-                            vpn_state != VpnState::Connected && vpn_state != VpnState::Enabling,
+                        items.toggle.set_text(if vpn_state == VpnState::Connected {
+                            "Disable VPN"
+                        } else {
+                            "Enable VPN"
+                        });
+                        items.toggle.set_enabled(
+                            vpn_state != VpnState::Enabling,
                         );
                         items.location.set_enabled(true);
                         items.settings.set_enabled(true);
@@ -331,8 +338,8 @@ fn set_vpn_enabling(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Enabling;
-    items.enable.set_enabled(false);
-    items.disable.set_enabled(false);
+    items.toggle.set_text("Enable VPN");
+    items.toggle.set_enabled(false);
     update_tray_icon(tray, vpn_state);
     status.state = "Enabling".to_string();
     status.message = Some("Connecting…".to_string());
@@ -350,8 +357,8 @@ fn set_vpn_connected(
 ) {
     *vpn_state = VpnState::Connected;
     *connected_since = Some(Instant::now());
-    items.enable.set_enabled(false);
-    items.disable.set_enabled(true);
+    items.toggle.set_text("Disable VPN");
+    items.toggle.set_enabled(true);
     update_tray_icon(tray, vpn_state);
     status.state = "Connected".to_string();
     status.connected_since_unix = Some(current_unix_ts());
@@ -372,8 +379,8 @@ fn set_vpn_disabled(
 ) {
     *vpn_state = VpnState::Disabled;
     *connected_since = None;
-    items.enable.set_enabled(true);
-    items.disable.set_enabled(false);
+    items.toggle.set_text("Enable VPN");
+    items.toggle.set_enabled(true);
     update_tray_icon(tray, vpn_state);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
@@ -388,8 +395,8 @@ fn set_vpn_failed(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Disabled;
-    items.enable.set_enabled(true);
-    items.disable.set_enabled(false);
+    items.toggle.set_text("Enable VPN");
+    items.toggle.set_enabled(true);
     update_tray_icon(tray, vpn_state);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
@@ -407,8 +414,8 @@ fn set_vpn_dropped(
 ) {
     *vpn_state = VpnState::Dropped;
     *connected_since = None;
-    items.enable.set_enabled(true);
-    items.disable.set_enabled(false);
+    items.toggle.set_text("Enable VPN");
+    items.toggle.set_enabled(true);
     update_tray_icon(tray, vpn_state);
     status.state = "Dropped".to_string();
     status.connected_since_unix = None;
@@ -425,8 +432,8 @@ fn set_vpn_unreachable(
 ) {
     *vpn_state = VpnState::ServerUnreachable;
     *connected_since = None;
-    items.enable.set_enabled(true);
-    items.disable.set_enabled(false);
+    items.toggle.set_text("Enable VPN");
+    items.toggle.set_enabled(true);
     update_tray_icon(tray, vpn_state);
     status.state = "ServerUnreachable".to_string();
     status.connected_since_unix = None;
@@ -569,8 +576,8 @@ fn handle_hc_event(
                     *connected_since = Some(Instant::now());
                     status.connected_since_unix = Some(current_unix_ts());
                 }
-                items.enable.set_enabled(false);
-                items.disable.set_enabled(true);
+                items.toggle.set_text("Disable VPN");
+                items.toggle.set_enabled(true);
                 update_tray_icon(tray, vpn_state);
                 status.state = "Connected".to_string();
                 status.message = None;
@@ -614,16 +621,18 @@ fn handle_menu_event(
 ) {
     if id == items.dashboard.id() {
         spawn_ui("status");
-    } else if id == items.enable.id() {
-        set_vpn_enabling(tray, items, vpn_state, daemon_status);
-        if do_enable_vpn(adapter, config) {
-            set_vpn_connected(tray, items, vpn_state, connected_since, daemon_status, config, None);
+    } else if id == items.toggle.id() {
+        if *vpn_state == VpnState::Connected {
+            do_disable_vpn(adapter, config);
+            set_vpn_disabled(tray, items, vpn_state, connected_since, daemon_status);
         } else {
-            set_vpn_failed(tray, items, vpn_state, daemon_status);
+            set_vpn_enabling(tray, items, vpn_state, daemon_status);
+            if do_enable_vpn(adapter, config) {
+                set_vpn_connected(tray, items, vpn_state, connected_since, daemon_status, config, None);
+            } else {
+                set_vpn_failed(tray, items, vpn_state, daemon_status);
+            }
         }
-    } else if id == items.disable.id() {
-        do_disable_vpn(adapter, config);
-        set_vpn_disabled(tray, items, vpn_state, connected_since, daemon_status);
     } else if id == items.location.id() {
         spawn_ui("location");
     } else if id == items.autoconnect.id() {
@@ -645,8 +654,7 @@ fn handle_menu_event(
 
 struct MenuItems {
     dashboard: MenuItem,
-    enable: MenuItem,
-    disable: MenuItem,
+    toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
     autoconnect: CheckMenuItem,
     autostart: CheckMenuItem,
@@ -660,8 +668,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let setup_complete = config.setup_complete;
     let dashboard = MenuItem::new("Status Dashboard", true, None);
     let sep1 = PredefinedMenuItem::separator();
-    let enable = MenuItem::new("Enable VPN", setup_complete, None);
-    let disable = MenuItem::new("Disable VPN", false, None);
+    let toggle = MenuItem::new("Enable VPN", setup_complete, None);
     let sep2 = PredefinedMenuItem::separator();
     let location = MenuItem::new("Change Location...", setup_complete, None);
     let autoconnect =
@@ -679,8 +686,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
 
     let _ = menu.append(&dashboard);
     let _ = menu.append(&sep1);
-    let _ = menu.append(&enable);
-    let _ = menu.append(&disable);
+    let _ = menu.append(&toggle);
     let _ = menu.append(&sep2);
     let _ = menu.append(&location);
     let _ = menu.append(&autoconnect);
@@ -705,8 +711,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
 
     let items = MenuItems {
         dashboard,
-        enable,
-        disable,
+        toggle,
         location,
         autoconnect,
         autostart,
