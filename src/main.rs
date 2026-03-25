@@ -113,7 +113,7 @@ fn run_tray_daemon() {
     save_daemon_status(&daemon_status);
 
     // Build tray icon and menu.
-    let (tray, items, menu) = build_tray(&config);
+    let (tray, items) = build_tray(&config);
 
     // Health-check notification channel: background thread → main loop.
     let (hc_tx, hc_rx) = std::sync::mpsc::channel::<HcEvent>();
@@ -173,15 +173,26 @@ fn run_tray_daemon() {
         let dialog_open = any_ui_open();
         if dialog_open != dialog_was_open {
             if dialog_open {
-                let locked = Menu::new();
-                let _ = locked.append(&MenuItem::new(
-                    "Close the open window first",
-                    false,
-                    None,
-                ));
-                tray.set_menu(Some(Box::new(locked)));
+                items.dashboard.set_enabled(false);
+                items.enable.set_enabled(false);
+                items.disable.set_enabled(false);
+                items.location.set_enabled(false);
+                items.autoconnect.set_enabled(false);
+                items.autostart.set_enabled(false);
+                items.settings.set_enabled(false);
+                items.exit.set_enabled(false);
             } else {
-                tray.set_menu(Some(Box::new(menu.clone())));
+                // Restore each item to its correct state.
+                items.dashboard.set_enabled(true);
+                items.settings.set_enabled(true);
+                items.exit.set_enabled(true);
+                items.autoconnect.set_enabled(true);
+                items.autostart.set_enabled(AutoStartManager::is_available());
+                let setup_done = config.setup_complete;
+                items.enable.set_enabled(
+                    setup_done && vpn_state != VpnState::Connected && vpn_state != VpnState::Enabling,
+                );
+                items.location.set_enabled(setup_done);
             }
             dialog_was_open = dialog_open;
         }
@@ -626,7 +637,7 @@ struct MenuItems {
     exit: MenuItem,
 }
 
-fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems, Menu) {
+fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let menu = Menu::new();
 
     let setup_complete = config.setup_complete;
@@ -668,9 +679,6 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems, Menu) {
             tray_icon::Icon::from_rgba(vec![0xFF, 0xC1, 0x07, 0xFF], 1, 1).unwrap()
         });
 
-    // Clone before moving into the builder so we can reattach after a dialog closes.
-    let menu_handle = menu.clone();
-
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(initial_icon)
@@ -688,7 +696,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems, Menu) {
         settings,
         exit,
     };
-    (tray, items, menu_handle)
+    (tray, items)
 }
 
 // --------------------------------------------------------------------------
