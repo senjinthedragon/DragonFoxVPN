@@ -137,7 +137,7 @@ fn run_tray_daemon() {
     // Track local VPN state for the daemon loop.
     let mut vpn_state = VpnState::Disabled;
     let mut connected_since: Option<Instant> = None;
-    update_tray_icon(&tray, &vpn_state);
+    update_tray_icon(&tray, &vpn_state, None);
 
     // Auto-connect on startup if configured.
     if setup_complete && config.auto_connect {
@@ -340,7 +340,7 @@ fn set_vpn_enabling(
     *vpn_state = VpnState::Enabling;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(false);
-    update_tray_icon(tray, vpn_state);
+    update_tray_icon(tray, vpn_state, None);
     status.state = "Enabling".to_string();
     status.message = Some("Connecting…".to_string());
     save_daemon_status(status);
@@ -359,7 +359,6 @@ fn set_vpn_connected(
     *connected_since = Some(Instant::now());
     items.toggle.set_text("Disable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state);
     status.state = "Connected".to_string();
     status.connected_since_unix = Some(current_unix_ts());
     status.location = config
@@ -367,6 +366,7 @@ fn set_vpn_connected(
         .clone()
         .unwrap_or_else(|| "Unknown".to_string());
     status.message = message;
+    update_tray_icon(tray, vpn_state, Some(&status.location));
     save_daemon_status(status);
 }
 
@@ -381,7 +381,7 @@ fn set_vpn_disabled(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state);
+    update_tray_icon(tray, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
     status.message = None;
@@ -397,7 +397,7 @@ fn set_vpn_failed(
     *vpn_state = VpnState::Disabled;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state);
+    update_tray_icon(tray, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
     status.message = Some("Failed to enable VPN.".to_string());
@@ -416,7 +416,7 @@ fn set_vpn_dropped(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state);
+    update_tray_icon(tray, vpn_state, None);
     status.state = "Dropped".to_string();
     status.connected_since_unix = None;
     status.message = message;
@@ -434,7 +434,7 @@ fn set_vpn_unreachable(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state);
+    update_tray_icon(tray, vpn_state, None);
     status.state = "ServerUnreachable".to_string();
     status.connected_since_unix = None;
     status.message = Some("VPN server unreachable.".to_string());
@@ -578,7 +578,7 @@ fn handle_hc_event(
                 }
                 items.toggle.set_text("Disable VPN");
                 items.toggle.set_enabled(true);
-                update_tray_icon(tray, vpn_state);
+                update_tray_icon(tray, vpn_state, Some(&status.location));
                 status.state = "Connected".to_string();
                 status.message = None;
                 save_daemon_status(status);
@@ -725,7 +725,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
 // Tray icon colour
 // --------------------------------------------------------------------------
 
-fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState) {
+fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState, location: Option<&str>) {
     let color = match vpn_state {
         VpnState::Connected => &COLOR_GREEN,
         VpnState::Dropped => &COLOR_RED,
@@ -734,15 +734,18 @@ fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState) {
         VpnState::Disabled => &COLOR_YELLOW,
     };
     let tooltip = match vpn_state {
-        VpnState::Connected => "DragonFoxVPN: Connected",
-        VpnState::Dropped => "DragonFoxVPN: Connection Dropped",
-        VpnState::ServerUnreachable => "DragonFoxVPN: Server Unreachable",
-        VpnState::Enabling => "DragonFoxVPN: Connecting…",
-        VpnState::Disabled => "DragonFoxVPN: Disabled",
+        VpnState::Connected => format!(
+            "Connected: {}",
+            location.unwrap_or("Unknown")
+        ),
+        VpnState::Dropped => "Connection Dropped".to_string(),
+        VpnState::ServerUnreachable => "Server Unreachable".to_string(),
+        VpnState::Enabling => "Connecting…".to_string(),
+        VpnState::Disabled => "Disconnected".to_string(),
     };
     let rgba = create_status_icon_rgba(color);
     if let Ok(icon) = tray_icon::Icon::from_rgba(rgba, 64, 64) {
         let _ = tray.set_icon(Some(icon));
     }
-    let _ = tray.set_tooltip(Some(tooltip));
+    let _ = tray.set_tooltip(Some(&tooltip));
 }
