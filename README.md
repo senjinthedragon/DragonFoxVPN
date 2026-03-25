@@ -220,12 +220,15 @@ Then run the app normally (no sudo):
 
 On first launch the app shows a setup dialog. Here's what each field means:
 
-| Field                | What to enter                                                                                    |
-| -------------------- | ------------------------------------------------------------------------------------------------ |
-| **VPN Gateway IP**   | Your Pi's LAN IP address (the same IP you SSH into it with)                                      |
-| **ISP Gateway IP**   | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
-| **DNS Server**       | Enter the same IP as your VPN Gateway - the Pi handles DNS when connected                        |
-| **VPN Switcher URL** | `http://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20`                          |
+| Field                | What to enter                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| **VPN Switcher URL** | `http://` or `https://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20`            |
+| **VPN Server IP**    | Your Pi's LAN IP address (the same IP you SSH into it with). Auto-filled when you enter the URL. |
+| **Router IP**        | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
+
+The **VPN Server IP** field is automatically populated via DNS lookup when you enter a valid Switcher URL. You can override it manually if needed.
+
+Use the **Test Connection** button to verify all three values before saving - it checks that the switcher page is reachable and returns locations, and that both IPs respond to pings.
 
 Settings are saved to the config file and can be changed later via **Settings...** in the tray menu.
 

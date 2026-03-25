@@ -5,7 +5,8 @@
 // See LICENSE for full license information.
 
 use dragonfox_vpn::api::{
-    country_to_iso, parse_locations, strip_continent_emojis, strip_country_emojis, urlencoded,
+    country_to_iso, ensure_trailing_slash, extract_php_error, parse_locations,
+    resolve_redirect, strip_continent_emojis, strip_country_emojis, urlencoded,
 };
 
 // ---------------------------------------------------------------------------
@@ -263,4 +264,90 @@ fn test_strip_country_emojis_multiple_flags() {
     let input = "🇺🇸🇬🇧 Multi";
     let result = strip_country_emojis(input);
     assert_eq!(result, "Multi");
+}
+
+// ---------------------------------------------------------------------------
+// ensure_trailing_slash
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_trailing_slash_added_when_no_path() {
+    assert_eq!(ensure_trailing_slash("http://10.0.0.20"), "http://10.0.0.20/");
+    assert_eq!(ensure_trailing_slash("https://vpn.example.com"), "https://vpn.example.com/");
+}
+
+#[test]
+fn test_trailing_slash_not_duplicated() {
+    assert_eq!(ensure_trailing_slash("http://10.0.0.20/"), "http://10.0.0.20/");
+}
+
+#[test]
+fn test_trailing_slash_not_added_when_path_present() {
+    assert_eq!(ensure_trailing_slash("http://10.0.0.20/switch"), "http://10.0.0.20/switch");
+    assert_eq!(ensure_trailing_slash("https://vpn.example.com/vpn/"), "https://vpn.example.com/vpn/");
+}
+
+// ---------------------------------------------------------------------------
+// resolve_redirect
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_resolve_redirect_absolute_url_returned_as_is() {
+    assert_eq!(
+        resolve_redirect("http://10.0.0.20/", "https://10.0.0.20/"),
+        "https://10.0.0.20/"
+    );
+    assert_eq!(
+        resolve_redirect("http://old.host/", "http://new.host/path"),
+        "http://new.host/path"
+    );
+}
+
+#[test]
+fn test_resolve_redirect_absolute_path_uses_current_host() {
+    assert_eq!(
+        resolve_redirect("http://10.0.0.20/", "/switch"),
+        "http://10.0.0.20/switch"
+    );
+    assert_eq!(
+        resolve_redirect("https://vpn.example.com/foo", "/bar"),
+        "https://vpn.example.com/bar"
+    );
+}
+
+#[test]
+fn test_resolve_redirect_relative_path_returned_as_is() {
+    // Relative paths (no leading slash, no scheme) are passed through unchanged.
+    assert_eq!(
+        resolve_redirect("http://10.0.0.20/", "switch"),
+        "switch"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// extract_php_error
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_extract_php_error_returns_none_when_absent() {
+    assert!(extract_php_error("<html><body><p>All good.</p></body></html>").is_none());
+    assert!(extract_php_error("").is_none());
+}
+
+#[test]
+fn test_extract_php_error_finds_error_message() {
+    let html = "<html><body><p class='error'><strong>Invalid location value</strong></p></body></html>";
+    assert_eq!(extract_php_error(html).as_deref(), Some("Invalid location value"));
+}
+
+#[test]
+fn test_extract_php_error_trims_whitespace() {
+    let html = "<html><body><p class=\"error\"><strong>  Bad request  </strong></p></body></html>";
+    assert_eq!(extract_php_error(html).as_deref(), Some("Bad request"));
+}
+
+#[test]
+fn test_extract_php_error_returns_none_for_empty_strong() {
+    let html = "<html><body><p class='error'><strong>   </strong></p></body></html>";
+    assert!(extract_php_error(html).is_none());
 }

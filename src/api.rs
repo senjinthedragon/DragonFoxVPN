@@ -140,7 +140,7 @@ impl VpnApi {
 
 /// Add a trailing slash if the URL has no path component so Apache doesn't
 /// issue a 301 that ureq would follow as a GET.
-fn ensure_trailing_slash(url: &str) -> String {
+pub fn ensure_trailing_slash(url: &str) -> String {
     if url.matches('/').count() < 3 {
         format!("{}/", url.trim_end_matches('/'))
     } else {
@@ -149,7 +149,7 @@ fn ensure_trailing_slash(url: &str) -> String {
 }
 
 /// Resolve a redirect Location header value against the current URL.
-fn resolve_redirect(current: &str, location: &str) -> String {
+pub fn resolve_redirect(current: &str, location: &str) -> String {
     if location.starts_with("http://") || location.starts_with("https://") {
         location.to_string()
     } else if location.starts_with('/') {
@@ -169,7 +169,7 @@ fn resolve_redirect(current: &str, location: &str) -> String {
 
 /// Extract the text content of `<p class='error'><strong>...</strong></p>` from
 /// the PHP backend's HTML response. Returns `None` if not present.
-fn extract_php_error(html: &str) -> Option<String> {
+pub fn extract_php_error(html: &str) -> Option<String> {
     let doc = Html::parse_document(html);
     let sel = Selector::parse(".error strong").ok()?;
     let text: String = doc.select(&sel).next()?.text().collect();
