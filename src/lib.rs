@@ -14,6 +14,7 @@ pub mod config;
 pub mod icons;
 pub mod state;
 pub mod system;
+pub mod vpn_runtime;
 
 /// Returns false if another instance of DragonFoxVPN is already running.
 pub fn single_instance_check() -> bool {
