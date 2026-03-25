@@ -358,15 +358,6 @@ impl eframe::App for StatusWindow {
                     ui.add_space(4.0);
                     ui.colored_label(egui::Color32::GRAY, msg);
                 }
-
-                // Warn if daemon status is stale.
-                let age = current_unix_ts().saturating_sub(status.updated_unix);
-                if age > 15 {
-                    ui.colored_label(
-                        egui::Color32::YELLOW,
-                        format!("Warning: daemon status is {age}s old"),
-                    );
-                }
             } else {
                 ui.colored_label(
                     egui::Color32::YELLOW,
