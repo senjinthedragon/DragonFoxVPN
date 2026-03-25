@@ -165,13 +165,21 @@ fn run_tray_daemon() {
             }
         }
 
-        // Modal behaviour: detach the menu while a dialog is open so the tray
-        // icon produces no menu and accepts no input. Reattach once the dialog
-        // closes (lock file disappears).
+        // Modal behaviour: while a dialog is open, replace the tray menu with
+        // a locked placeholder so right-click shows nothing actionable.
+        // libappindicator on Linux always shows a menu on right-click and
+        // cannot suppress it, so set_menu(None) has no effect — swapping to a
+        // disabled placeholder is the only reliable way to block interaction.
         let dialog_open = any_ui_open();
         if dialog_open != dialog_was_open {
             if dialog_open {
-                tray.set_menu(None);
+                let locked = Menu::new();
+                let _ = locked.append(&MenuItem::new(
+                    "Close the open window first",
+                    false,
+                    None,
+                ));
+                tray.set_menu(Some(Box::new(locked)));
             } else {
                 tray.set_menu(Some(Box::new(menu.clone())));
             }
