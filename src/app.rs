@@ -519,25 +519,31 @@ impl eframe::App for LocationWindow {
                     }
                     ctx.request_repaint();
                 }
-                LocationMsg::SwitchDone(Ok(label)) => {
-                    self.cfg.last_location = Some(label.clone());
+                LocationMsg::SwitchDone(Ok(confirmed_label)) => {
+                    // Always sync last_location to what the backend actually reports.
+                    self.cfg.last_location = Some(confirmed_label.clone());
                     self.cfg.save();
+                    write_daemon_command(DaemonCommand::ReloadConfig);
+
+                    // Verify the backend actually switched to the location we requested.
+                    let requested = self.selected_label.as_deref().unwrap_or("");
+                    if !confirmed_label.eq_ignore_ascii_case(requested) {
+                        self.switch_status = Some(format!(
+                            "Switch failed: backend is still on {confirmed_label}"
+                        ));
+                        self.switch_ok = false;
+                        self.is_switching = false;
+                        return;
+                    }
 
                     // If currently connected, tell the daemon to reconnect.
                     if let Some(daemon) = load_daemon_status() {
                         if daemon.state == "Connected" {
                             write_daemon_command(DaemonCommand::Reconnect);
-                            self.switch_status =
-                                Some(format!("Switched to {label} (reconnect requested)"));
-                        } else {
-                            self.switch_status = Some(format!("Switched to {label}"));
                         }
-                    } else {
-                        self.switch_status = Some(format!("Switched to {label}"));
                     }
                     self.switch_ok = true;
                     self.is_switching = false;
-                    // Close after a short moment so the user can see the result.
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 LocationMsg::SwitchDone(Err(e)) => {
@@ -626,10 +632,25 @@ impl eframe::App for LocationWindow {
                             ui.selectable_label(is_selected, &display_label)
                         });
 
-                        if response.inner.clicked() {
+                        // Left-click: immediately switch to this location.
+                        if response.inner.clicked()
+                            && !self.is_switching
+                            && self.selected_value.as_deref() != Some(loc.value.as_str())
+                        {
                             self.selected_value = Some(loc.value.clone());
                             self.selected_label = Some(loc.label.clone());
+                            if let Some(url) = self.cfg.switcher_url.clone() {
+                                let value = loc.value.clone();
+                                self.is_switching = true;
+                                self.switch_status = None;
+                                let tx = self.msg_tx.clone();
+                                std::thread::spawn(move || {
+                                    let result = VpnApi::switch_location(&url, &value);
+                                    let _ = tx.send(LocationMsg::SwitchDone(result));
+                                });
+                            }
                         }
+                        // Right-click: toggle favorite.
                         if response.inner.secondary_clicked() {
                             self.cfg.toggle_favorite(&loc.label);
                         }
@@ -651,45 +672,16 @@ impl eframe::App for LocationWindow {
                 }
 
                 ui.add_space(8.0);
-                let has_selection = self.selected_value.is_some();
                 ui.horizontal(|ui| {
-                    if ui.button("Cancel").clicked() {
+                    if !self.is_switching && ui.button("Cancel").clicked() {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-                    let switch_label = self
-                        .selected_label
-                        .as_deref()
-                        .map(|l| format!("Switch to {l}"))
-                        .unwrap_or_else(|| "Switch Location".to_string());
-                    if ui
-                        .add_enabled(
-                            has_selection && !self.is_switching,
-                            egui::Button::new(&switch_label),
-                        )
-                        .clicked()
-                    {
-                        if let (Some(value), Some(label), Some(url)) = (
-                            self.selected_value.clone(),
-                            self.selected_label.clone(),
-                            self.cfg.switcher_url.clone(),
-                        ) {
-                            self.is_switching = true;
-                            self.switch_status = None;
-                            let tx = self.msg_tx.clone();
-                            std::thread::spawn(move || {
-                                let result = match VpnApi::switch_location(&url, &value) {
-                                    Ok(_) => {
-                                        std::thread::sleep(Duration::from_secs(2));
-                                        Ok(label)
-                                    }
-                                    Err(e) => Err(e),
-                                };
-                                let _ = tx.send(LocationMsg::SwitchDone(result));
-                            });
-                        }
                     }
                     if self.is_switching {
                         ui.spinner();
+                        ui.label(format!(
+                            "Switching to {}…",
+                            self.selected_label.as_deref().unwrap_or("location")
+                        ));
                     }
                 });
             }

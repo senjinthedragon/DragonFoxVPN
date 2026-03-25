@@ -9,7 +9,7 @@
 // switches the active location via HTTP POST. SSL verification is disabled
 // to support self-signed certificates on the local network.
 
-use log::error;
+use log::{error, warn};
 use scraper::{Html, Selector};
 
 /// A single available VPN location from the backend.
@@ -51,7 +51,14 @@ impl VpnApi {
     }
 
     /// POST to the switcher URL to change the active VPN location.
-    pub fn switch_location(switcher_url: &str, location_value: &str) -> Result<(), String> {
+    /// Returns the confirmed active location label from the server response.
+    ///
+    /// ureq converts POST to GET when following 301/302 redirects, which
+    /// causes PHP to see REQUEST_METHOD=GET and skip the switch handler.
+    /// We disable automatic redirect following and re-POST manually so the
+    /// body is preserved across the full redirect chain (e.g.
+    /// http://host → http://host/ → https://host/).
+    pub fn switch_location(switcher_url: &str, location_value: &str) -> Result<String, String> {
         let tls = native_tls::TlsConnector::builder()
             .danger_accept_invalid_certs(true)
             .build()
@@ -59,22 +66,115 @@ impl VpnApi {
 
         let agent = ureq::AgentBuilder::new()
             .tls_connector(std::sync::Arc::new(tls))
+            .redirects(0)
             .build();
 
-        let body = format!("location={}", urlencoded(location_value));
+        let mut url = ensure_trailing_slash(switcher_url);
 
-        agent
-            .post(switcher_url)
-            .timeout(std::time::Duration::from_secs(10))
-            .set("Content-Type", "application/x-www-form-urlencoded")
-            .send_string(&body)
-            .map_err(|e| {
-                error!("Failed to switch location: {e}");
-                format!("Failed to switch location: {e}")
-            })?;
+        for hop in 0..5u8 {
+            log::info!("switch_location: POST to {url} (hop {hop}) location={location_value}");
 
-        Ok(())
+            match agent
+                .post(&url)
+                .timeout(std::time::Duration::from_secs(45))
+                .send_form(&[("location", location_value)])
+            {
+                Ok(response) => {
+                    let status = response.status();
+                    log::info!("switch_location: HTTP {status}");
+
+                    // With redirects(0), ureq returns 3xx as Ok — handle manually.
+                    if (301..=308).contains(&status) {
+                        match response.header("location") {
+                            Some(loc) => {
+                                log::info!("switch_location: redirect {status} → {loc}");
+                                url = resolve_redirect(&url, loc);
+                                continue;
+                            }
+                            None => return Err(format!("Redirect {status} with no Location header")),
+                        }
+                    }
+
+                    let html = response.into_string().map_err(|e| e.to_string())?;
+
+                    if html.contains("class='error'") || html.contains("class=\"error\"") {
+                        let msg = extract_php_error(&html).unwrap_or_else(|| {
+                            "Backend reported an error during location switch".to_string()
+                        });
+                        error!("Switch location backend error: {msg}");
+                        return Err(msg);
+                    }
+
+                    let (_, current) = parse_locations(&html);
+                    return match current {
+                        Some(label) => Ok(label),
+                        None => {
+                            warn!("Switch POST succeeded but no active location in response HTML");
+                            Err("Switch did not appear to take effect (no active location in response)".to_string())
+                        }
+                    };
+                }
+                Err(ureq::Error::Status(code, response))
+                    if matches!(code, 301 | 302 | 303 | 307 | 308) =>
+                {
+                    match response.header("location") {
+                        Some(loc) => {
+                            log::info!("switch_location: redirect {code} → {loc}");
+                            url = resolve_redirect(&url, loc);
+                        }
+                        None => {
+                            return Err(format!("Redirect {code} with no Location header"))
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!("switch_location failed: {e}");
+                    return Err(format!("Failed to switch location: {e}"));
+                }
+            }
+        }
+
+        Err("Too many redirects following switch POST".to_string())
     }
+}
+
+/// Add a trailing slash if the URL has no path component so Apache doesn't
+/// issue a 301 that ureq would follow as a GET.
+fn ensure_trailing_slash(url: &str) -> String {
+    if url.matches('/').count() < 3 {
+        format!("{}/", url.trim_end_matches('/'))
+    } else {
+        url.to_string()
+    }
+}
+
+/// Resolve a redirect Location header value against the current URL.
+fn resolve_redirect(current: &str, location: &str) -> String {
+    if location.starts_with("http://") || location.starts_with("https://") {
+        location.to_string()
+    } else if location.starts_with('/') {
+        // Absolute path — keep scheme+host from current URL.
+        if let Some(idx) = current.find("://") {
+            let rest = &current[idx + 3..];
+            let host_end = rest.find('/').unwrap_or(rest.len());
+            let base = &current[..idx + 3 + host_end];
+            format!("{base}{location}")
+        } else {
+            location.to_string()
+        }
+    } else {
+        location.to_string()
+    }
+}
+
+/// Extract the text content of `<p class='error'><strong>...</strong></p>` from
+/// the PHP backend's HTML response. Returns `None` if not present.
+fn extract_php_error(html: &str) -> Option<String> {
+    let doc = Html::parse_document(html);
+    let sel = Selector::parse(".error strong").ok()?;
+    let text: String = doc.select(&sel).next()?.text().collect();
+    let trimmed = text.trim().to_string();
+    if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
 pub fn urlencoded(s: &str) -> String {
