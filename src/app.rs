@@ -164,6 +164,10 @@ struct SettingsWindow {
     last_resolved_url: String,
     resolving: bool,
     resolve_rx: Option<std::sync::mpsc::Receiver<Option<String>>>,
+    // Test Connection
+    testing: bool,
+    test_rx: Option<std::sync::mpsc::Receiver<Vec<(String, bool)>>>,
+    test_results: Vec<(String, bool)>,
 }
 
 impl SettingsWindow {
@@ -179,6 +183,9 @@ impl SettingsWindow {
             last_resolved_url: cfg.switcher_url.unwrap_or_default(),
             resolving: false,
             resolve_rx: None,
+            testing: false,
+            test_rx: None,
+            test_results: Vec::new(),
         }
     }
 }
@@ -221,6 +228,16 @@ impl eframe::App for SettingsWindow {
                 ctx.request_repaint_after(Duration::from_millis(100));
             }
         }
+        // Drain test result.
+        if let Some(ref rx) = self.test_rx {
+            if let Ok(results) = rx.try_recv() {
+                self.test_results = results;
+                self.testing = false;
+                self.test_rx = None;
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(100));
+            }
+        }
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
@@ -258,6 +275,20 @@ impl eframe::App for SettingsWindow {
                     ui.end_row();
                 });
 
+            // Test connection results.
+            if !self.test_results.is_empty() {
+                ui.add_space(6.0);
+                for (label, ok) in &self.test_results {
+                    let color = if *ok {
+                        egui::Color32::LIGHT_GREEN
+                    } else {
+                        egui::Color32::LIGHT_RED
+                    };
+                    let prefix = if *ok { "✓" } else { "✗" };
+                    ui.colored_label(color, format!("{prefix}  {label}"));
+                }
+            }
+
             if let Some(ref msg) = self.message.clone() {
                 let color = if msg.starts_with("Saved") {
                     egui::Color32::LIGHT_GREEN
@@ -268,14 +299,42 @@ impl eframe::App for SettingsWindow {
             }
 
             ui.add_space(8.0);
-            if ui.button("Save Settings").clicked() {
-                self.try_save(ctx);
-            }
+            let busy = self.testing || self.resolving;
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(!busy, egui::Button::new("Test Connection"))
+                    .clicked()
+                {
+                    self.start_test();
+                }
+                if self.testing {
+                    ui.spinner();
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Save Settings").clicked() {
+                        self.try_save(ctx);
+                    }
+                });
+            });
         });
     }
 }
 
 impl SettingsWindow {
+    fn start_test(&mut self) {
+        let url = self.switcher_url.trim().to_string();
+        let vpn_ip = self.vpn_gateway.to_ip_string();
+        let router_ip = self.isp_gateway.to_ip_string();
+
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let _ = tx.send(run_connection_test(url, vpn_ip, router_ip));
+        });
+        self.test_rx = Some(rx);
+        self.test_results.clear();
+        self.testing = true;
+    }
+
     fn try_save(&mut self, ctx: &egui::Context) {
         let url = self.switcher_url.trim().to_string();
 
@@ -799,6 +858,53 @@ impl IpInput {
 // --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
+
+/// Run the three connection checks for the Settings "Test Connection" button.
+/// Blocking — intended to be called from a background thread.
+fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(String, bool)> {
+    let mut results = Vec::new();
+
+    // 1. Switcher URL — fetch locations to confirm the page is the real switcher.
+    if url.starts_with("http://") || url.starts_with("https://") {
+        match VpnApi::fetch_locations(&url) {
+            Ok((locs, _)) if !locs.is_empty() => {
+                results.push((format!("Switcher URL: {} locations found", locs.len()), true));
+            }
+            Ok(_) => {
+                results.push(("Switcher URL: reached but no locations found — wrong page?".to_string(), false));
+            }
+            Err(e) => {
+                results.push((format!("Switcher URL: {e}"), false));
+            }
+        }
+    } else {
+        results.push(("Switcher URL: not set or invalid".to_string(), false));
+    }
+
+    // 2. VPN Server IP — ping.
+    if vpn_ip.split('.').count() == 4 && !vpn_ip.starts_with('.') {
+        let ok = SystemHandler::ping_host(&vpn_ip);
+        results.push((
+            format!("VPN Server ({vpn_ip}): {}", if ok { "reachable" } else { "unreachable" }),
+            ok,
+        ));
+    } else {
+        results.push(("VPN Server IP: not set".to_string(), false));
+    }
+
+    // 3. Router IP — ping.
+    if router_ip.split('.').count() == 4 && !router_ip.starts_with('.') {
+        let ok = SystemHandler::ping_host(&router_ip);
+        results.push((
+            format!("Router ({router_ip}): {}", if ok { "reachable" } else { "unreachable" }),
+            ok,
+        ));
+    } else {
+        results.push(("Router IP: not set".to_string(), false));
+    }
+
+    results
+}
 
 /// Resolve the hostname in a URL to an IP address string.
 /// Returns None if the URL is malformed or DNS lookup fails.
