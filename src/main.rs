@@ -113,7 +113,7 @@ fn run_tray_daemon() {
     save_daemon_status(&daemon_status);
 
     // Build tray icon and menu.
-    let (tray, items) = build_tray(&config);
+    let (tray, items, menu) = build_tray(&config);
 
     // Health-check notification channel: background thread → main loop.
     let (hc_tx, hc_rx) = std::sync::mpsc::channel::<HcEvent>();
@@ -154,6 +154,8 @@ fn run_tray_daemon() {
     // -----------------------------------------------------------------------
     // Main tray event loop
     // -----------------------------------------------------------------------
+    let mut dialog_was_open = false;
+
     loop {
         // Service GTK so the tray icon menu stays responsive.
         #[cfg(target_os = "linux")]
@@ -161,6 +163,19 @@ fn run_tray_daemon() {
             while gtk::events_pending() {
                 gtk::main_iteration_do(false);
             }
+        }
+
+        // Modal behaviour: detach the menu while a dialog is open so the tray
+        // icon produces no menu and accepts no input. Reattach once the dialog
+        // closes (lock file disappears).
+        let dialog_open = any_ui_open();
+        if dialog_open != dialog_was_open {
+            if dialog_open {
+                tray.set_menu(None);
+            } else {
+                tray.set_menu(Some(Box::new(menu.clone())));
+            }
+            dialog_was_open = dialog_open;
         }
 
         // Process health-check events from background thread.
@@ -408,7 +423,20 @@ fn do_disable_vpn(adapter: &str, config: &AppConfig) {
 // Spawn a UI subprocess
 // --------------------------------------------------------------------------
 
+fn any_ui_open() -> bool {
+    let config_dir = dragonfox_vpn::config::get_config_path()
+        .parent()
+        .unwrap_or_else(|| std::path::Path::new("."))
+        .to_path_buf();
+    ["settings", "status", "location"]
+        .iter()
+        .any(|m| config_dir.join(format!("ui_{m}.lock")).exists())
+}
+
 fn spawn_ui(mode: &str) {
+    if any_ui_open() {
+        return;
+    }
     if let Ok(exe) = std::env::current_exe() {
         let _ = std::process::Command::new(exe)
             .arg("--ui")
@@ -590,7 +618,7 @@ struct MenuItems {
     exit: MenuItem,
 }
 
-fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
+fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems, Menu) {
     let menu = Menu::new();
 
     let setup_complete = config.setup_complete;
@@ -632,6 +660,9 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
             tray_icon::Icon::from_rgba(vec![0xFF, 0xC1, 0x07, 0xFF], 1, 1).unwrap()
         });
 
+    // Clone before moving into the builder so we can reattach after a dialog closes.
+    let menu_handle = menu.clone();
+
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(initial_icon)
@@ -649,7 +680,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         settings,
         exit,
     };
-    (tray, items)
+    (tray, items, menu_handle)
 }
 
 // --------------------------------------------------------------------------
