@@ -157,10 +157,13 @@ struct SettingsWindow {
     first_run: bool,
     vpn_gateway: String,
     isp_gateway: String,
-    dns_server: String,
     switcher_url: String,
     message: Option<String>,
     saved: bool,
+    // Auto-resolve VPN server IP from the switcher URL.
+    last_resolved_url: String,
+    resolving: bool,
+    resolve_rx: Option<std::sync::mpsc::Receiver<Option<String>>>,
 }
 
 impl SettingsWindow {
@@ -170,10 +173,12 @@ impl SettingsWindow {
             first_run,
             vpn_gateway: cfg.vpn_gateway.clone().unwrap_or_default(),
             isp_gateway: cfg.isp_gateway.clone().unwrap_or_default(),
-            dns_server: cfg.dns_server.clone().unwrap_or_default(),
             switcher_url: cfg.switcher_url.clone().unwrap_or_default(),
             message: None,
             saved: false,
+            last_resolved_url: cfg.switcher_url.unwrap_or_default(),
+            resolving: false,
+            resolve_rx: None,
         }
     }
 }
@@ -186,6 +191,35 @@ impl eframe::App for SettingsWindow {
         if ctx.input(|i| i.viewport().close_requested()) && self.first_run && !self.saved {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.message = Some("Setup is required to use DragonFoxVPN.".to_string());
+        }
+
+        // Trigger VPN IP auto-resolve when the switcher URL changes.
+        let url_valid = self.switcher_url.starts_with("http://")
+            || self.switcher_url.starts_with("https://");
+        if url_valid
+            && self.switcher_url != self.last_resolved_url
+            && !self.resolving
+        {
+            let (tx, rx) = std::sync::mpsc::sync_channel(1);
+            let url = self.switcher_url.clone();
+            std::thread::spawn(move || {
+                let _ = tx.send(resolve_host_from_url(&url));
+            });
+            self.resolve_rx = Some(rx);
+            self.resolving = true;
+            self.last_resolved_url = self.switcher_url.clone();
+        }
+        // Drain resolve result.
+        if let Some(ref rx) = self.resolve_rx {
+            if let Ok(result) = rx.try_recv() {
+                if let Some(ip) = result {
+                    self.vpn_gateway = ip;
+                }
+                self.resolving = false;
+                self.resolve_rx = None;
+            } else {
+                ctx.request_repaint_after(Duration::from_millis(100));
+            }
         }
 
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -208,17 +242,21 @@ impl eframe::App for SettingsWindow {
                 .num_columns(2)
                 .spacing([8.0, 6.0])
                 .show(ui, |ui| {
-                    ui.colored_label(egui::Color32::GRAY, "VPN Gateway IP");
-                    ui.text_edit_singleline(&mut self.vpn_gateway);
-                    ui.end_row();
-                    ui.colored_label(egui::Color32::GRAY, "ISP Gateway IP");
-                    ui.text_edit_singleline(&mut self.isp_gateway);
-                    ui.end_row();
-                    ui.colored_label(egui::Color32::GRAY, "DNS Server");
-                    ui.text_edit_singleline(&mut self.dns_server);
-                    ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, "VPN Switcher URL");
                     ui.text_edit_singleline(&mut self.switcher_url);
+                    ui.end_row();
+                    ui.colored_label(egui::Color32::GRAY, "VPN Server IP");
+                    if self.resolving {
+                        ui.horizontal(|ui| {
+                            ui.text_edit_singleline(&mut self.vpn_gateway);
+                            ui.spinner();
+                        });
+                    } else {
+                        ui.text_edit_singleline(&mut self.vpn_gateway);
+                    }
+                    ui.end_row();
+                    ui.colored_label(egui::Color32::GRAY, "Router IP");
+                    ui.text_edit_singleline(&mut self.isp_gateway);
                     ui.end_row();
                 });
 
@@ -243,16 +281,15 @@ impl SettingsWindow {
     fn try_save(&mut self, ctx: &egui::Context) {
         let vpn_gw = self.vpn_gateway.trim().to_string();
         let isp_gw = self.isp_gateway.trim().to_string();
-        let dns = self.dns_server.trim().to_string();
         let url = self.switcher_url.trim().to_string();
 
-        if vpn_gw.is_empty() || isp_gw.is_empty() || dns.is_empty() || url.is_empty() {
+        if vpn_gw.is_empty() || isp_gw.is_empty() || url.is_empty() {
             self.message = Some("All fields are required.".to_string());
             return;
         }
-        if !is_valid_ip(&vpn_gw) || !is_valid_ip(&isp_gw) || !is_valid_ip(&dns) {
+        if !is_valid_ip(&vpn_gw) || !is_valid_ip(&isp_gw) {
             self.message =
-                Some("Gateway and DNS fields must be valid IPv4 addresses.".to_string());
+                Some("VPN Server IP and Router IP must be valid IPv4 addresses.".to_string());
             return;
         }
         if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -262,9 +299,9 @@ impl SettingsWindow {
         }
 
         let mut cfg = AppConfig::load();
-        cfg.vpn_gateway = Some(vpn_gw);
+        cfg.vpn_gateway = Some(vpn_gw.clone());
         cfg.isp_gateway = Some(isp_gw);
-        cfg.dns_server = Some(dns);
+        cfg.dns_server = Some(vpn_gw); // DNS is always the VPN server IP
         cfg.switcher_url = Some(url);
         cfg.setup_complete = true;
         cfg.save();
@@ -698,6 +735,28 @@ fn fetch_flag_bytes(iso_code: &str) -> Option<Vec<u8>> {
             None
         }
     }
+}
+
+// --------------------------------------------------------------------------
+// Helpers
+// --------------------------------------------------------------------------
+
+/// Resolve the hostname in a URL to an IP address string.
+/// Returns None if the URL is malformed or DNS lookup fails.
+fn resolve_host_from_url(url: &str) -> Option<String> {
+    use std::net::ToSocketAddrs;
+    // Strip scheme.
+    let rest = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))?;
+    // Take only the host[:port] part.
+    let host_part = rest.split('/').next()?;
+    // Remove any explicit port for the lookup key, then add :80 for ToSocketAddrs.
+    let host = host_part.split(':').next()?;
+    let addr_str = format!("{host}:80");
+    let mut addrs = addr_str.to_socket_addrs().ok()?;
+    let ip = addrs.next()?.ip().to_string();
+    Some(ip)
 }
 
 // --------------------------------------------------------------------------
