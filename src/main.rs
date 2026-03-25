@@ -517,10 +517,18 @@ fn do_enable_vpn(adapter: &str, config: &AppConfig) -> bool {
     let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
     let dns = config.dns_server.clone().unwrap_or_default();
     let ok = vpn_runtime::enable_vpn(adapter, &vpn_gw, &dns);
-    if ok {
-        set_vpn_active(adapter, &vpn_gw);
+    if !ok {
+        return false;
     }
-    ok
+    // Verify the route is actually present in the table before declaring success.
+    // The routing commands may return exit 0 yet the route may have been
+    // immediately reverted (e.g. by NetworkManager).
+    if !SystemHandler::is_route_active(&vpn_gw, adapter) {
+        warn!("enable_vpn returned ok but route is not present — treating as failure.");
+        return false;
+    }
+    set_vpn_active(adapter, &vpn_gw);
+    true
 }
 
 fn do_disable_vpn(adapter: &str, config: &AppConfig) {

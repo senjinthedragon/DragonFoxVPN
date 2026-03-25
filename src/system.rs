@@ -10,8 +10,24 @@
 // connectivity checks. Supports Linux (ip/resolvectl) and Windows
 // (route.exe/netsh).
 
-use log::error;
+use log::{error, info, warn};
 use std::process::Command;
+
+/// Log the result of a routing/system command at the appropriate level.
+fn log_cmd((stdout, stderr, code): (String, String, i32)) {
+    if code == 0 {
+        if !stdout.is_empty() {
+            info!("  → ok: {stdout}");
+        } else {
+            info!("  → ok (exit 0)");
+        }
+    } else {
+        warn!("  → exit {code}{}{}",
+            if stdout.is_empty() { String::new() } else { format!(" stdout={stdout}") },
+            if stderr.is_empty() { String::new() } else { format!(" stderr={stderr}") },
+        );
+    }
+}
 
 /// Run a shell command, returning (stdout, stderr, exit_code).
 /// Uses runtime OS detection to choose shell, matching the Python version.
@@ -95,6 +111,7 @@ impl SystemHandler {
     /// Configure system routing to use the VPN gateway.
     /// Returns true on success.
     pub fn enable_routing(adapter: &str, vpn_gw: &str, vpn_dns: &str) -> bool {
+        info!("enable_routing: adapter={adapter} vpn_gw={vpn_gw} vpn_dns={vpn_dns}");
         if !Self::is_safe_adapter(adapter) || !is_valid_ipv4(vpn_gw) || !is_valid_ipv4(vpn_dns) {
             error!("Refusing to run routing command with unsafe parameters.");
             return false;
@@ -109,14 +126,16 @@ impl SystemHandler {
             ));
             code == 0
         } else {
-            run_command(&format!(
+            log_cmd(run_command(&format!(
                 "sudo sysctl -w net.ipv6.conf.{adapter}.disable_ipv6=1"
-            ));
-            run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}"));
-            run_command(&format!("sudo ip route del default dev {adapter}"));
-            let (_, _, code) = run_command(&format!(
+            )));
+            log_cmd(run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}")));
+            log_cmd(run_command(&format!("sudo ip route del default dev {adapter}")));
+            let result = run_command(&format!(
                 "sudo ip route add default via {vpn_gw} dev {adapter} metric 50"
             ));
+            let code = result.2;
+            log_cmd(result);
             code == 0
         }
     }
