@@ -188,7 +188,10 @@ fn run_tray_daemon() {
     let mut connected_since: Option<Instant> = None;
     update_tray_icon(&tray, &vpn_state, None);
 
-    // Auto-connect on startup if configured.
+    // Auto-connect on startup if configured; otherwise ensure routing is in
+    // the non-VPN state. This recovers from a previous crash (SIGSEGV, etc.)
+    // that left VPN routing active, or any other situation where the routes
+    // are in an unexpected state.
     if setup_complete && config.auto_connect {
         set_vpn_enabling(&tray, &items, &mut vpn_state, &mut daemon_status);
         if do_enable_vpn(&adapter, &config) {
@@ -204,6 +207,8 @@ fn run_tray_daemon() {
         } else {
             set_vpn_failed(&tray, &items, &mut vpn_state, &mut daemon_status);
         }
+    } else if setup_complete {
+        do_disable_vpn(&adapter, &config);
     }
 
     // Open settings on first run.
