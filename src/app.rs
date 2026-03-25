@@ -232,14 +232,9 @@ impl eframe::App for SettingsWindow {
             }
 
             ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                if !self.first_run && ui.button("Cancel").clicked() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-                if ui.button("Save Settings").clicked() {
-                    self.try_save(ctx);
-                }
-            });
+            if ui.button("Save Settings").clicked() {
+                self.try_save(ctx);
+            }
         });
     }
 }
@@ -366,11 +361,6 @@ impl eframe::App for StatusWindow {
             }
 
             ui.add_space(8.0);
-            ui.vertical_centered(|ui| {
-                if ui.button("Close").clicked() {
-                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                }
-            });
         });
 
         // Refresh once per second so the duration counter updates.
@@ -662,19 +652,16 @@ impl eframe::App for LocationWindow {
                     ui.colored_label(color, msg);
                 }
 
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    if !self.is_switching && ui.button("Cancel").clicked() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-                    }
-                    if self.is_switching {
+                if self.is_switching {
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label(format!(
                             "Switching to {}…",
                             self.selected_label.as_deref().unwrap_or("location")
                         ));
-                    }
-                });
+                    });
+                }
             }
         });
     }
