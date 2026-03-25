@@ -65,7 +65,7 @@ fn clear_vpn_active() {
 }
 
 /// Restore normal routing if the VPN is active. Safe to call from a signal
-/// handler or panic hook — reads from the static and issues OS commands only.
+/// handler or panic hook - reads from the static and issues OS commands only.
 fn emergency_vpn_restore() {
     if let Ok(g) = vpn_active_lock().lock() {
         if let Some((adapter, vpn_gateway)) = g.as_ref() {

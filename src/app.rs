@@ -860,18 +860,18 @@ impl IpInput {
 // --------------------------------------------------------------------------
 
 /// Run the three connection checks for the Settings "Test Connection" button.
-/// Blocking — intended to be called from a background thread.
+/// Blocking - intended to be called from a background thread.
 fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(String, bool)> {
     let mut results = Vec::new();
 
-    // 1. Switcher URL — fetch locations to confirm the page is the real switcher.
+    // 1. Switcher URL - fetch locations to confirm the page is the real switcher.
     if url.starts_with("http://") || url.starts_with("https://") {
         match VpnApi::fetch_locations(&url) {
             Ok((locs, _)) if !locs.is_empty() => {
                 results.push((format!("Switcher URL: {} locations found", locs.len()), true));
             }
             Ok(_) => {
-                results.push(("Switcher URL: reached but no locations found — wrong page?".to_string(), false));
+                results.push(("Switcher URL: reached but no locations found - wrong page?".to_string(), false));
             }
             Err(e) => {
                 results.push((format!("Switcher URL: {e}"), false));
@@ -881,7 +881,7 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
         results.push(("Switcher URL: not set or invalid".to_string(), false));
     }
 
-    // 2. VPN Server IP — ping.
+    // 2. VPN Server IP - ping.
     if vpn_ip.split('.').count() == 4 && !vpn_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&vpn_ip);
         results.push((
@@ -892,7 +892,7 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
         results.push(("VPN Server IP: not set".to_string(), false));
     }
 
-    // 3. Router IP — ping.
+    // 3. Router IP - ping.
     if router_ip.split('.').count() == 4 && !router_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&router_ip);
         results.push((
