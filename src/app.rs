@@ -155,8 +155,8 @@ pub fn run_location_window() {
 
 struct SettingsWindow {
     first_run: bool,
-    vpn_gateway: String,
-    isp_gateway: String,
+    vpn_gateway: IpInput,
+    isp_gateway: IpInput,
     switcher_url: String,
     message: Option<String>,
     saved: bool,
@@ -171,8 +171,8 @@ impl SettingsWindow {
         let cfg = AppConfig::load();
         Self {
             first_run,
-            vpn_gateway: cfg.vpn_gateway.clone().unwrap_or_default(),
-            isp_gateway: cfg.isp_gateway.clone().unwrap_or_default(),
+            vpn_gateway: IpInput::from_str(cfg.vpn_gateway.as_deref().unwrap_or("")),
+            isp_gateway: IpInput::from_str(cfg.isp_gateway.as_deref().unwrap_or("")),
             switcher_url: cfg.switcher_url.clone().unwrap_or_default(),
             message: None,
             saved: false,
@@ -213,7 +213,7 @@ impl eframe::App for SettingsWindow {
         if let Some(ref rx) = self.resolve_rx {
             if let Ok(result) = rx.try_recv() {
                 if let Some(ip) = result {
-                    self.vpn_gateway = ip;
+                    self.vpn_gateway = IpInput::from_str(&ip);
                 }
                 self.resolving = false;
                 self.resolve_rx = None;
@@ -246,17 +246,15 @@ impl eframe::App for SettingsWindow {
                     ui.text_edit_singleline(&mut self.switcher_url);
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, "VPN Server IP");
-                    if self.resolving {
-                        ui.horizontal(|ui| {
-                            ui.text_edit_singleline(&mut self.vpn_gateway);
+                    ui.horizontal(|ui| {
+                        self.vpn_gateway.show(ui, "vpn_gw");
+                        if self.resolving {
                             ui.spinner();
-                        });
-                    } else {
-                        ui.text_edit_singleline(&mut self.vpn_gateway);
-                    }
+                        }
+                    });
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, "Router IP");
-                    ui.text_edit_singleline(&mut self.isp_gateway);
+                    self.isp_gateway.show(ui, "isp_gw");
                     ui.end_row();
                 });
 
@@ -279,24 +277,21 @@ impl eframe::App for SettingsWindow {
 
 impl SettingsWindow {
     fn try_save(&mut self, ctx: &egui::Context) {
-        let vpn_gw = self.vpn_gateway.trim().to_string();
-        let isp_gw = self.isp_gateway.trim().to_string();
         let url = self.switcher_url.trim().to_string();
 
-        if vpn_gw.is_empty() || isp_gw.is_empty() || url.is_empty() {
-            self.message = Some("All fields are required.".to_string());
-            return;
-        }
-        if !is_valid_ip(&vpn_gw) || !is_valid_ip(&isp_gw) {
+        if !self.vpn_gateway.is_valid() || !self.isp_gateway.is_valid() {
             self.message =
-                Some("VPN Server IP and Router IP must be valid IPv4 addresses.".to_string());
+                Some("VPN Server IP and Router IP must be complete, valid IPv4 addresses.".to_string());
             return;
         }
-        if !url.starts_with("http://") && !url.starts_with("https://") {
+        if url.is_empty() || (!url.starts_with("http://") && !url.starts_with("https://")) {
             self.message =
                 Some("Switcher URL must start with http:// or https://".to_string());
             return;
         }
+
+        let vpn_gw = self.vpn_gateway.to_ip_string();
+        let isp_gw = self.isp_gateway.to_ip_string();
 
         let mut cfg = AppConfig::load();
         cfg.vpn_gateway = Some(vpn_gw.clone());
@@ -738,6 +733,70 @@ fn fetch_flag_bytes(iso_code: &str) -> Option<Vec<u8>> {
 }
 
 // --------------------------------------------------------------------------
+// IP address segmented input widget
+// --------------------------------------------------------------------------
+
+struct IpInput {
+    octets: [String; 4],
+}
+
+impl IpInput {
+    fn from_str(ip: &str) -> Self {
+        let mut parts = ip.splitn(4, '.');
+        Self {
+            octets: std::array::from_fn(|_| parts.next().unwrap_or("").to_string()),
+        }
+    }
+
+    fn to_ip_string(&self) -> String {
+        format!("{}.{}.{}.{}", self.octets[0], self.octets[1], self.octets[2], self.octets[3])
+    }
+
+    fn is_valid(&self) -> bool {
+        self.octets.iter().all(|o| !o.is_empty() && o.parse::<u8>().is_ok())
+    }
+
+    /// Render four narrow octet fields separated by dots.
+    /// Auto-advances focus to the next field when 3 digits are entered or a
+    /// dot is typed (matching the Windows IP-address common control behaviour).
+    fn show(&mut self, ui: &mut egui::Ui, id_salt: &str) {
+        let base_id = egui::Id::new(id_salt);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            for i in 0..4usize {
+                let field_id = base_id.with(i);
+                let prev_len = self.octets[i].len();
+
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.octets[i])
+                        .id(field_id)
+                        .desired_width(30.0)
+                        .char_limit(4), // allow 4 briefly so we can detect the dot
+                );
+
+                // If the user typed a '.' advance to the next octet.
+                let has_dot = self.octets[i].contains('.');
+                // Keep only digits and cap at 3 chars.
+                self.octets[i].retain(|c| c.is_ascii_digit());
+                if self.octets[i].len() > 3 {
+                    self.octets[i].truncate(3);
+                }
+
+                // Auto-advance when the field just became 3 digits, or on dot.
+                let just_filled = self.octets[i].len() == 3 && prev_len < 3;
+                if (just_filled || has_dot) && i < 3 {
+                    ui.memory_mut(|m| m.request_focus(base_id.with(i + 1)));
+                }
+
+                if i < 3 {
+                    ui.label(".");
+                }
+            }
+        });
+    }
+}
+
+// --------------------------------------------------------------------------
 // Helpers
 // --------------------------------------------------------------------------
 
@@ -757,15 +816,6 @@ fn resolve_host_from_url(url: &str) -> Option<String> {
     let mut addrs = addr_str.to_socket_addrs().ok()?;
     let ip = addrs.next()?.ip().to_string();
     Some(ip)
-}
-
-// --------------------------------------------------------------------------
-// Validation
-// --------------------------------------------------------------------------
-
-fn is_valid_ip(s: &str) -> bool {
-    let parts: Vec<&str> = s.split('.').collect();
-    parts.len() == 4 && parts.iter().all(|p| !p.is_empty() && p.parse::<u8>().is_ok())
 }
 
 // --------------------------------------------------------------------------
