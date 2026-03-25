@@ -188,7 +188,7 @@ fn run_tray_daemon() {
                 items.toggle.set_enabled(false);
                 items.location.set_enabled(false);
                 items.autoconnect.set_enabled(false);
-                items.autostart.set_enabled(false);
+                if let Some(ref a) = items.autostart { a.set_enabled(false); }
                 items.settings.set_enabled(false);
                 items.exit.set_enabled(false);
             } else {
@@ -197,7 +197,7 @@ fn run_tray_daemon() {
                 items.settings.set_enabled(true);
                 items.exit.set_enabled(true);
                 items.autoconnect.set_enabled(true);
-                items.autostart.set_enabled(AutoStartManager::is_available());
+                if let Some(ref a) = items.autostart { a.set_enabled(true); }
                 let setup_done = config.setup_complete;
                 items.toggle.set_text(if vpn_state == VpnState::Connected {
                     "Disable VPN"
@@ -639,8 +639,8 @@ fn handle_menu_event(
         let mut cfg = AppConfig::load();
         cfg.auto_connect = items.autoconnect.is_checked();
         cfg.save();
-    } else if id == items.autostart.id() {
-        AutoStartManager::set_autostart(items.autostart.is_checked());
+    } else if items.autostart.as_ref().is_some_and(|a| id == *a.id()) {
+        AutoStartManager::set_autostart(items.autostart.as_ref().unwrap().is_checked());
     } else if id == items.settings.id() {
         spawn_ui("settings");
     } else if id == items.exit.id() {
@@ -657,7 +657,7 @@ struct MenuItems {
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
     autoconnect: CheckMenuItem,
-    autostart: CheckMenuItem,
+    autostart: Option<CheckMenuItem>, // Windows only; None on Linux/macOS
     settings: MenuItem,
     exit: MenuItem,
 }
@@ -673,11 +673,12 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let location = MenuItem::new("Change Location...", setup_complete, None);
     let autoconnect =
         CheckMenuItem::new("Auto-Connect on Start", true, config.auto_connect, None);
-    let autostart_avail = AutoStartManager::is_available();
-    let autostart = if autostart_avail {
-        CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None)
+    let autostart = if cfg!(target_os = "windows") {
+        let item = CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None);
+        let _ = menu.append(&item);
+        Some(item)
     } else {
-        CheckMenuItem::new("Run on Startup (Windows only)", false, false, None)
+        None
     };
     let sep3 = PredefinedMenuItem::separator();
     let settings = MenuItem::new("Settings...", true, None);
@@ -690,7 +691,6 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&sep2);
     let _ = menu.append(&location);
     let _ = menu.append(&autoconnect);
-    let _ = menu.append(&autostart);
     let _ = menu.append(&sep3);
     let _ = menu.append(&settings);
     let _ = menu.append(&sep4);
