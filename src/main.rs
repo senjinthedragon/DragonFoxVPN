@@ -39,6 +39,42 @@ use dragonfox_vpn::system::SystemHandler;
 use dragonfox_vpn::vpn_runtime;
 
 // --------------------------------------------------------------------------
+// Emergency VPN cleanup (used by signal handler and panic hook)
+// --------------------------------------------------------------------------
+
+/// Stores (adapter, vpn_gateway) while the VPN is active so that signal
+/// handlers and panic hooks can restore normal routing without access to
+/// the daemon's local state.
+static VPN_ACTIVE: std::sync::OnceLock<std::sync::Mutex<Option<(String, String)>>> =
+    std::sync::OnceLock::new();
+
+fn vpn_active_lock() -> &'static std::sync::Mutex<Option<(String, String)>> {
+    VPN_ACTIVE.get_or_init(|| std::sync::Mutex::new(None))
+}
+
+fn set_vpn_active(adapter: &str, vpn_gateway: &str) {
+    if let Ok(mut g) = vpn_active_lock().lock() {
+        *g = Some((adapter.to_string(), vpn_gateway.to_string()));
+    }
+}
+
+fn clear_vpn_active() {
+    if let Ok(mut g) = vpn_active_lock().lock() {
+        *g = None;
+    }
+}
+
+/// Restore normal routing if the VPN is active. Safe to call from a signal
+/// handler or panic hook — reads from the static and issues OS commands only.
+fn emergency_vpn_restore() {
+    if let Ok(g) = vpn_active_lock().lock() {
+        if let Some((adapter, vpn_gateway)) = g.as_ref() {
+            dragonfox_vpn::vpn_runtime::disable_vpn(adapter, vpn_gateway);
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
 // Entry point
 // --------------------------------------------------------------------------
 
@@ -46,6 +82,19 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .format_timestamp_secs()
         .init();
+
+    // Restore normal routing on SIGINT / SIGTERM (e.g. system shutdown or kill).
+    ctrlc::set_handler(|| {
+        emergency_vpn_restore();
+        std::process::exit(0);
+    })
+    .unwrap_or_else(|e| warn!("Failed to register signal handler: {e}"));
+
+    // Restore normal routing on panic before the process unwinds.
+    std::panic::set_hook(Box::new(|info| {
+        emergency_vpn_restore();
+        error!("Panic: {info}");
+    }));
 
     // UI subprocess mode: launched by the tray daemon for each dialog window.
     // GTK is NOT initialised here - each subprocess has a clean eframe event
@@ -448,12 +497,17 @@ fn set_vpn_unreachable(
 fn do_enable_vpn(adapter: &str, config: &AppConfig) -> bool {
     let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
     let dns = config.dns_server.clone().unwrap_or_default();
-    vpn_runtime::enable_vpn(adapter, &vpn_gw, &dns)
+    let ok = vpn_runtime::enable_vpn(adapter, &vpn_gw, &dns);
+    if ok {
+        set_vpn_active(adapter, &vpn_gw);
+    }
+    ok
 }
 
 fn do_disable_vpn(adapter: &str, config: &AppConfig) {
     let vpn_gw = config.vpn_gateway.clone().unwrap_or_default();
     vpn_runtime::disable_vpn(adapter, &vpn_gw);
+    clear_vpn_active();
 }
 
 // --------------------------------------------------------------------------
