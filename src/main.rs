@@ -375,6 +375,9 @@ fn run_tray_daemon() {
                 }
                 DaemonCommand::Restart => {
                     info!("Restart requested by settings subprocess.");
+                    if vpn_state == VpnState::Connected {
+                        do_disable_vpn(&adapter, &config);
+                    }
                     if let Ok(exe) = std::env::current_exe() {
                         let _ = std::process::Command::new(exe).spawn();
                     }
