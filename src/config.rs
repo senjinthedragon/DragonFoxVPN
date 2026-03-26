@@ -69,6 +69,9 @@ pub struct AppConfig {
     pub switcher_url: Option<String>,
     #[serde(default)]
     pub setup_complete: bool,
+    /// Language override. None = auto-detect from system locale.
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 impl Default for AppConfig {
@@ -83,6 +86,7 @@ impl Default for AppConfig {
             dns_server: None,
             switcher_url: None,
             setup_complete: false,
+            language: None,
         }
     }
 }

@@ -21,11 +21,10 @@ use std::time::{Duration, Instant};
 
 use log::{error, info, warn};
 use tray_icon::{
-    menu::{CheckMenuItem, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
     TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
 
-use dragonfox_vpn::autostart::AutoStartManager;
 use dragonfox_vpn::config::AppConfig;
 use dragonfox_vpn::locale::{t, t_fmt};
 use dragonfox_vpn::daemon_ipc::{
@@ -282,9 +281,6 @@ fn run_tray_daemon() {
                 items.dashboard.set_enabled(false);
                 items.toggle.set_enabled(false);
                 items.location.set_enabled(false);
-                items.autoconnect.set_enabled(false);
-                items.autoreconnect.set_enabled(false);
-                if let Some(ref a) = items.autostart { a.set_enabled(false); }
                 items.settings.set_enabled(false);
                 items.exit.set_enabled(false);
             } else {
@@ -292,9 +288,6 @@ fn run_tray_daemon() {
                 items.dashboard.set_enabled(true);
                 items.settings.set_enabled(true);
                 items.exit.set_enabled(true);
-                items.autoconnect.set_enabled(true);
-                items.autoreconnect.set_enabled(true);
-                if let Some(ref a) = items.autostart { a.set_enabled(true); }
                 let setup_done = config.setup_complete;
                 items.toggle.set_text(&if vpn_state == VpnState::Connected {
                     t("tray.disable_vpn")
@@ -842,16 +835,6 @@ fn handle_menu_event(
         }
     } else if id == items.location.id() {
         spawn_ui("location");
-    } else if id == items.autoconnect.id() {
-        let mut cfg = AppConfig::load();
-        cfg.auto_connect = items.autoconnect.is_checked();
-        cfg.save();
-    } else if id == items.autoreconnect.id() {
-        let mut cfg = AppConfig::load();
-        cfg.auto_reconnect = items.autoreconnect.is_checked();
-        cfg.save();
-    } else if items.autostart.as_ref().is_some_and(|a| id == *a.id()) {
-        AutoStartManager::set_autostart(items.autostart.as_ref().unwrap().is_checked());
     } else if id == items.settings.id() {
         spawn_ui("settings");
     } else if id == items.exit.id() {
@@ -868,9 +851,6 @@ struct MenuItems {
     dashboard: MenuItem,
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
-    autoconnect: CheckMenuItem,
-    autoreconnect: CheckMenuItem,
-    autostart: Option<CheckMenuItem>, // Windows only; None on Linux/macOS
     settings: MenuItem,
     exit: MenuItem,
 }
@@ -893,15 +873,6 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let toggle = MenuItem::new(&t("tray.enable_vpn"), setup_complete, None);
     let sep2 = PredefinedMenuItem::separator();
     let location = MenuItem::new(&t("tray.change_location"), setup_complete, None);
-    let autoconnect =
-        CheckMenuItem::new(&t("tray.autoconnect"), true, config.auto_connect, None);
-    let autoreconnect =
-        CheckMenuItem::new(&t("tray.autoreconnect"), true, config.auto_reconnect, None);
-    let autostart = if cfg!(target_os = "windows") {
-        Some(CheckMenuItem::new(&t("tray.run_on_startup"), true, AutoStartManager::is_enabled(), None))
-    } else {
-        None
-    };
     let sep3 = PredefinedMenuItem::separator();
     let settings = MenuItem::new(&t("tray.settings"), true, None);
     let sep4 = PredefinedMenuItem::separator();
@@ -916,11 +887,6 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&toggle);
     let _ = menu.append(&sep2);
     let _ = menu.append(&location);
-    let _ = menu.append(&autoconnect);
-    let _ = menu.append(&autoreconnect);
-    if let Some(ref a) = autostart {
-        let _ = menu.append(a);
-    }
     let _ = menu.append(&sep3);
     let _ = menu.append(&settings);
     let _ = menu.append(&sep4);
@@ -944,9 +910,6 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         dashboard,
         toggle,
         location,
-        autoconnect,
-        autoreconnect,
-        autostart,
         settings,
         exit,
     };

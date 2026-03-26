@@ -69,42 +69,71 @@ fn system_locale() -> String {
     String::new()
 }
 
+fn locale_to_lang(locale: &str) -> String {
+    let l = locale.to_lowercase();
+    if l.starts_with("zh") { "zh_CN".to_string() }
+    else if l.starts_with("ja") { "ja".to_string() }
+    else if l.starts_with("ko") { "ko".to_string() }
+    else if l.starts_with("de") { "de".to_string() }
+    else if l.starts_with("fr") { "fr".to_string() }
+    else if l.starts_with("es") { "es".to_string() }
+    else if l.starts_with("pt") { "pt_BR".to_string() }
+    else if l.starts_with("ru") { "ru".to_string() }
+    else if l.starts_with("it") { "it".to_string() }
+    else { "en".to_string() }
+}
+
 fn detected_language() -> &'static str {
-    DETECTED_LANG.get_or_init(|| {
-        let locale = system_locale().to_lowercase();
-        if locale.starts_with("zh") {
-            "zh_CN".to_string()
-        } else if locale.starts_with("ja") {
-            "ja".to_string()
-        } else if locale.starts_with("ko") {
-            "ko".to_string()
-        } else if locale.starts_with("de") {
-            "de".to_string()
-        } else if locale.starts_with("fr") {
-            "fr".to_string()
-        } else if locale.starts_with("es") {
-            "es".to_string()
-        } else if locale.starts_with("pt") {
-            "pt_BR".to_string()
-        } else if locale.starts_with("ru") {
-            "ru".to_string()
-        } else if locale.starts_with("it") {
-            "it".to_string()
-        } else {
-            "en".to_string()
-        }
-    })
+    DETECTED_LANG.get()
+        .map(|s| s.as_str())
+        .unwrap_or("en")
+}
+
+/// Returns the active language code (e.g. "de", "zh_CN").
+pub fn active_language() -> &'static str {
+    detected_language()
+}
+
+/// All supported languages as (code, display name) pairs, in display order.
+pub fn available_languages() -> &'static [(&'static str, &'static str)] {
+    &[
+        ("en",    "English"),
+        ("de",    "Deutsch"),
+        ("fr",    "Fran\u{00e7}ais"),
+        ("es",    "Espa\u{00f1}ol"),
+        ("pt_BR", "Portugu\u{00ea}s (Brasil)"),
+        ("it",    "Italiano"),
+        ("ru",    "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}"),
+        ("zh_CN", "\u{4e2d}\u{6587} (\u{7b80}\u{4f53})"),
+        ("ja",    "\u{65e5}\u{672c}\u{8a9e}"),
+        ("ko",    "\u{d55c}\u{ad6d}\u{c5b4}"),
+    ]
 }
 
 /// Initialize the translation table. Call once at startup before any t() calls.
+/// Reads the saved language from AppConfig; falls back to system locale.
 pub fn init() {
-    // Start with every English key as a baseline fallback.
+    // Check for a user-saved language preference first.
+    let saved = crate::config::AppConfig::load().language;
+    let lang = if let Some(ref code) = saved {
+        // Validate the saved code is one we actually support.
+        if available_languages().iter().any(|(c, _)| *c == code.as_str()) {
+            code.clone()
+        } else {
+            locale_to_lang(&system_locale())
+        }
+    } else {
+        locale_to_lang(&system_locale())
+    };
+
+    DETECTED_LANG.set(lang.clone()).ok();
+
+    // Build map: start with English baseline, overlay target language.
     let mut map: HashMap<String, String> =
         serde_json::from_str(EN).unwrap_or_default();
-    let lang = detected_language();
     if lang != "en" {
         let translated: HashMap<String, String> =
-            serde_json::from_str(json_for_lang(lang)).unwrap_or_default();
+            serde_json::from_str(json_for_lang(&lang)).unwrap_or_default();
         map.extend(translated);
     }
     TRANSLATIONS.set(map).ok();

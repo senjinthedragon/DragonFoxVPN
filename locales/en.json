@@ -46,6 +46,10 @@
   "settings.msg_invalid_ip": "VPN Server IP and Router IP must be complete, valid IPv4 addresses.",
   "settings.msg_invalid_url": "Switcher URL must start with http:// or https://",
   "settings.msg_saved": "Saved settings.",
+  "settings.section_network": "Network",
+  "settings.section_behavior": "Behavior",
+  "settings.section_language": "Language",
+  "settings.restart_required": "Takes effect after restart",
 
   "test.url_ok": "Switcher URL: {count} locations found",
   "test.url_wrong_page": "Switcher URL: reached but no locations found - wrong page?",

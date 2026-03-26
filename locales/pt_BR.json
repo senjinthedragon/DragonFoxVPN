@@ -46,6 +46,10 @@
   "settings.msg_invalid_ip": "IP do servidor VPN e IP do roteador devem ser endere\u00e7os IPv4 v\u00e1lidos.",
   "settings.msg_invalid_url": "A URL do comutador deve come\u00e7ar com http:// ou https://",
   "settings.msg_saved": "Configura\u00e7\u00f5es salvas.",
+  "settings.section_network": "Rede",
+  "settings.section_behavior": "Comportamento",
+  "settings.section_language": "Idioma",
+  "settings.restart_required": "Aplica-se ap\u00f3s reiniciar",
 
   "test.url_ok": "URL do comutador: {count} localiza\u00e7\u00f5es encontradas",
   "test.url_wrong_page": "URL do comutador: acess\u00edvel, mas sem localiza\u00e7\u00f5es - p\u00e1gina errada?",

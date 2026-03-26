@@ -46,6 +46,10 @@
   "settings.msg_invalid_ip": "L'IP du serveur VPN et l'IP du routeur doivent \u00eatre des adresses IPv4 valides.",
   "settings.msg_invalid_url": "L'URL du commutateur doit commencer par http:// ou https://",
   "settings.msg_saved": "Param\u00e8tres enregistr\u00e9s.",
+  "settings.section_network": "R\u00e9seau",
+  "settings.section_behavior": "Comportement",
+  "settings.section_language": "Langue",
+  "settings.restart_required": "Prend effet apr\u00e8s red\u00e9marrage",
 
   "test.url_ok": "URL commutateur\u00a0: {count} serveurs trouv\u00e9s",
   "test.url_wrong_page": "URL commutateur\u00a0: accessible mais aucun serveur trouv\u00e9 - mauvaise page\u00a0?",

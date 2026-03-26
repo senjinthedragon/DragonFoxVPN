@@ -326,6 +326,25 @@ pub fn run_location_window() {
 }
 
 // --------------------------------------------------------------------------
+// UI helpers
+// --------------------------------------------------------------------------
+
+/// Draws a coloured section label followed by a full-width separator rule.
+/// Produces a clean visual divider that groups related settings.
+fn section_header(ui: &mut egui::Ui, label: &str) {
+    ui.add_space(6.0);
+    if label.is_empty() {
+        ui.separator();
+    } else {
+        ui.horizontal(|ui| {
+            ui.colored_label(egui::Color32::from_rgb(0x00, 0x7A, 0xCC), label);
+            ui.separator();
+        });
+    }
+    ui.add_space(2.0);
+}
+
+// --------------------------------------------------------------------------
 // Settings window
 // --------------------------------------------------------------------------
 
@@ -336,6 +355,12 @@ struct SettingsWindow {
     switcher_url: String,
     message: Option<String>,
     saved: bool,
+    // Behavior toggles (moved from tray menu)
+    auto_connect: bool,
+    auto_reconnect: bool,
+    run_on_startup: bool, // Windows only
+    // Language selection
+    language: String, // locale code, e.g. "en", "de"; empty = system auto
     // Auto-resolve VPN server IP from the switcher URL.
     last_resolved_url: String,
     resolving: bool,
@@ -357,6 +382,12 @@ impl SettingsWindow {
             switcher_url: cfg.switcher_url.clone().unwrap_or_default(),
             message: None,
             saved: false,
+            auto_connect: cfg.auto_connect,
+            auto_reconnect: cfg.auto_reconnect,
+            run_on_startup: crate::autostart::AutoStartManager::is_enabled(),
+            language: cfg.language.clone().unwrap_or_else(|| {
+                crate::locale::active_language().to_string()
+            }),
             last_resolved_url: cfg.switcher_url.unwrap_or_default(),
             resolving: false,
             resolve_rx: None,
@@ -416,6 +447,7 @@ impl eframe::App for SettingsWindow {
         }
 
         let panel = egui::TopBottomPanel::top("settings_content").show(ctx, |ui| {
+            ui.add_space(4.0);
             ui.vertical_centered(|ui| {
                 ui.heading(if self.first_run {
                     t("settings.heading_setup")
@@ -423,27 +455,24 @@ impl eframe::App for SettingsWindow {
                     t("settings.heading_settings")
                 });
                 if self.first_run {
-                    ui.colored_label(
-                        egui::Color32::GRAY,
-                        t("settings.subtitle_setup"),
-                    );
+                    ui.colored_label(egui::Color32::GRAY, t("settings.subtitle_setup"));
                 }
             });
-            ui.add_space(8.0);
 
+            // ── Network ──────────────────────────────────────────────
+            section_header(ui, &t("settings.section_network"));
             egui::Grid::new("settings_grid")
                 .num_columns(2)
                 .spacing([8.0, 6.0])
                 .show(ui, |ui| {
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_url"));
-                    ui.text_edit_singleline(&mut self.switcher_url);
+                    ui.add(egui::TextEdit::singleline(&mut self.switcher_url)
+                        .desired_width(f32::INFINITY));
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_vpn_ip"));
                     ui.horizontal(|ui| {
                         self.vpn_gateway.show(ui, "vpn_gw");
-                        if self.resolving {
-                            ui.spinner();
-                        }
+                        if self.resolving { ui.spinner(); }
                     });
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_router_ip"));
@@ -451,47 +480,62 @@ impl eframe::App for SettingsWindow {
                     ui.end_row();
                 });
 
-            // Test connection results.
+            // ── Behavior ─────────────────────────────────────────────
+            section_header(ui, &t("settings.section_behavior"));
+            ui.checkbox(&mut self.auto_connect, t("tray.autoconnect"));
+            ui.checkbox(&mut self.auto_reconnect, t("tray.autoreconnect"));
+            #[cfg(target_os = "windows")]
+            ui.checkbox(&mut self.run_on_startup, t("tray.run_on_startup"));
+
+            // ── Language ─────────────────────────────────────────────
+            section_header(ui, &t("settings.section_language"));
+            ui.horizontal(|ui| {
+                let current_name = crate::locale::available_languages()
+                    .iter()
+                    .find(|(c, _)| *c == self.language.as_str())
+                    .map(|(_, n)| *n)
+                    .unwrap_or("English");
+                egui::ComboBox::from_id_source("lang_select")
+                    .selected_text(current_name)
+                    .width(200.0)
+                    .show_ui(ui, |ui| {
+                        for (code, name) in crate::locale::available_languages() {
+                            ui.selectable_value(&mut self.language, code.to_string(), *name);
+                        }
+                    });
+                ui.colored_label(egui::Color32::GRAY, t("settings.restart_required"));
+            });
+
+            // ── Test results (when available) ─────────────────────────
             if !self.test_results.is_empty() {
-                ui.add_space(6.0);
+                section_header(ui, "");
                 for (label, ok) in &self.test_results {
-                    let color = if *ok {
-                        egui::Color32::LIGHT_GREEN
-                    } else {
-                        egui::Color32::LIGHT_RED
-                    };
+                    let color = if *ok { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
                     let prefix = if *ok { "✓" } else { "✗" };
                     ui.colored_label(color, format!("{prefix}  {label}"));
                 }
             }
 
             if let Some(ref msg) = self.message.clone() {
-                let color = if self.saved {
-                    egui::Color32::LIGHT_GREEN
-                } else {
-                    egui::Color32::LIGHT_RED
-                };
+                ui.add_space(4.0);
+                let color = if self.saved { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
                 ui.colored_label(color, msg);
             }
 
             ui.add_space(8.0);
             let busy = self.testing || self.resolving;
             ui.horizontal(|ui| {
-                if ui
-                    .add_enabled(!busy, egui::Button::new(t("settings.btn_test")))
-                    .clicked()
-                {
+                if ui.add_enabled(!busy, egui::Button::new(t("settings.btn_test"))).clicked() {
                     self.start_test();
                 }
-                if self.testing {
-                    ui.spinner();
-                }
+                if self.testing { ui.spinner(); }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button(t("settings.btn_save")).clicked() {
                         self.try_save(ctx);
                     }
                 });
             });
+            ui.add_space(4.0);
         });
         egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |_| {});
         let h = panel.response.rect.height();
@@ -540,7 +584,14 @@ impl SettingsWindow {
         cfg.dns_server = Some(vpn_gw); // DNS is always the VPN server IP
         cfg.switcher_url = Some(url);
         cfg.setup_complete = true;
+        cfg.auto_connect = self.auto_connect;
+        cfg.auto_reconnect = self.auto_reconnect;
+        cfg.language = Some(self.language.clone());
         cfg.save();
+
+        // Apply run-on-startup (Windows registry, not stored in config).
+        #[cfg(target_os = "windows")]
+        crate::autostart::AutoStartManager::set_autostart(self.run_on_startup);
 
         // Tell the tray daemon to reload its config.
         write_daemon_command(DaemonCommand::ReloadConfig);
