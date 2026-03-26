@@ -54,7 +54,17 @@ fn set_dns_resolvectl(adapter: &str, vpn_dns: &str) {
 /// Uses runtime OS detection to choose shell, matching the Python version.
 pub fn run_command(cmd: &str) -> (String, String, i32) {
     let result = if std::env::consts::OS == "windows" {
-        Command::new("cmd").args(["/C", cmd]).output()
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            Command::new("cmd")
+                .args(["/C", cmd])
+                .creation_flags(CREATE_NO_WINDOW)
+                .output()
+        }
+        #[cfg(not(target_os = "windows"))]
+        { Command::new("cmd").args(["/C", cmd]).output() }
     } else {
         Command::new("sh").args(["-c", cmd]).output()
     };
