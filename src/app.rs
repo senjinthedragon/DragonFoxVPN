@@ -120,28 +120,28 @@ fn run_native_with_fallback(
 ) {
     let make_app = std::sync::Arc::new(std::sync::Mutex::new(Some(make_app)));
 
+    // Explicitly try glow (OpenGL) first - lighter weight and more widely
+    // supported. If it fails, fall back to wgpu (DirectX/Vulkan on Windows).
+    let mut glow_options = options.clone();
+    glow_options.renderer = eframe::Renderer::Glow;
+
     let make_app_clone = make_app.clone();
     let result = eframe::run_native(
         title,
-        options.clone(),
+        glow_options,
         Box::new(move |_cc| Ok(make_app_clone.lock().unwrap().take().unwrap()())),
     );
 
     if let Err(e) = result {
-        let msg = e.to_string().to_lowercase();
-        if msg.contains("opengl") || msg.contains("egui_glow") || msg.contains("glow") {
-            log::warn!("glow renderer unavailable ({e}), retrying with wgpu");
-            let mut wgpu_options = options;
-            wgpu_options.renderer = eframe::Renderer::Wgpu;
-            if let Err(e2) = eframe::run_native(
-                title,
-                wgpu_options,
-                Box::new(move |_cc| Ok(make_app.lock().unwrap().take().unwrap()())),
-            ) {
-                log::error!("wgpu renderer also failed: {e2}");
-            }
-        } else {
-            log::error!("Failed to open window: {e}");
+        log::warn!("glow renderer unavailable ({e}), retrying with wgpu");
+        let mut wgpu_options = options;
+        wgpu_options.renderer = eframe::Renderer::Wgpu;
+        if let Err(e2) = eframe::run_native(
+            title,
+            wgpu_options,
+            Box::new(move |_cc| Ok(make_app.lock().unwrap().take().unwrap()())),
+        ) {
+            log::error!("wgpu renderer also failed: {e2}");
         }
     }
 }
