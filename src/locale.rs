@@ -129,12 +129,18 @@ pub fn init() {
     DETECTED_LANG.set(lang.clone()).ok();
 
     // Build map: start with English baseline, overlay target language.
-    let mut map: HashMap<String, String> =
-        serde_json::from_str(EN).unwrap_or_default();
+    let mut map: HashMap<String, String> = match serde_json::from_str(EN) {
+        Ok(m) => m,
+        Err(e) => {
+            log::error!("Failed to parse English locale: {e}");
+            HashMap::new()
+        }
+    };
     if lang != "en" {
-        let translated: HashMap<String, String> =
-            serde_json::from_str(json_for_lang(&lang)).unwrap_or_default();
-        map.extend(translated);
+        match serde_json::from_str(json_for_lang(&lang)) {
+            Ok(translated) => map.extend::<HashMap<String, String>>(translated),
+            Err(e) => log::error!("Failed to parse locale '{lang}': {e}"),
+        }
     }
     TRANSLATIONS.set(map).ok();
 }
