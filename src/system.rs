@@ -22,9 +22,18 @@ fn log_cmd((stdout, stderr, code): (String, String, i32)) {
             info!("  → ok (exit 0)");
         }
     } else {
-        warn!("  → exit {code}{}{}",
-            if stdout.is_empty() { String::new() } else { format!(" stdout={stdout}") },
-            if stderr.is_empty() { String::new() } else { format!(" stderr={stderr}") },
+        warn!(
+            "  → exit {code}{}{}",
+            if stdout.is_empty() {
+                String::new()
+            } else {
+                format!(" stdout={stdout}")
+            },
+            if stderr.is_empty() {
+                String::new()
+            } else {
+                format!(" stderr={stderr}")
+            },
         );
     }
 }
@@ -33,8 +42,7 @@ fn log_cmd((stdout, stderr, code): (String, String, i32)) {
 /// systemd-resolved is simply not running (e.g. Garuda/Arch), since
 /// DNS will still flow correctly through the VPN tunnel in that case.
 fn set_dns_resolvectl(adapter: &str, vpn_dns: &str) {
-    let (_, stderr, code) =
-        run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}"));
+    let (_, stderr, code) = run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}"));
     if code == 0 {
         info!("  → DNS set via resolvectl ({vpn_dns})");
     } else if stderr.contains("org.freedesktop.resolve1")
@@ -64,7 +72,9 @@ pub fn run_command(cmd: &str) -> (String, String, i32) {
                 .output()
         }
         #[cfg(not(target_os = "windows"))]
-        { Command::new("cmd").args(["/C", cmd]).output() }
+        {
+            Command::new("cmd").args(["/C", cmd]).output()
+        }
     } else {
         Command::new("sh").args(["-c", cmd]).output()
     };
@@ -182,7 +192,9 @@ impl SystemHandler {
                 "sudo sysctl -w net.ipv6.conf.{adapter}.disable_ipv6=1"
             )));
             set_dns_resolvectl(adapter, vpn_dns);
-            log_cmd(run_command(&format!("sudo ip route del default dev {adapter}")));
+            log_cmd(run_command(&format!(
+                "sudo ip route del default dev {adapter}"
+            )));
             let result = run_command(&format!(
                 "sudo ip route add default via {vpn_gw} dev {adapter} metric 50"
             ));
@@ -213,8 +225,7 @@ impl SystemHandler {
             run_command(&format!(
                 "sudo sysctl -w net.ipv6.conf.{adapter}.disable_ipv6=0"
             ));
-            let (_, stderr, code) =
-                run_command(&format!("sudo resolvectl revert {adapter}"));
+            let (_, stderr, code) = run_command(&format!("sudo resolvectl revert {adapter}"));
             if code != 0
                 && !stderr.contains("org.freedesktop.resolve1")
                 && !stderr.contains("systemd-resolved")

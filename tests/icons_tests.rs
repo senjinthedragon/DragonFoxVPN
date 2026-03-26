@@ -27,7 +27,13 @@ fn test_rgba_buffer_is_correct_size() {
 
 #[test]
 fn test_rgba_buffer_length_is_same_for_all_colors() {
-    for color in [&COLOR_GREEN, &COLOR_RED, &COLOR_YELLOW, &COLOR_BLUE, &COLOR_GRAY] {
+    for color in [
+        &COLOR_GREEN,
+        &COLOR_RED,
+        &COLOR_YELLOW,
+        &COLOR_BLUE,
+        &COLOR_GRAY,
+    ] {
         assert_eq!(create_status_icon_rgba(color).len(), SIZE * SIZE * 4);
     }
 }
@@ -77,7 +83,13 @@ fn test_centre_pixel_is_fully_opaque() {
 
 #[test]
 fn test_centre_is_opaque_for_all_colors() {
-    for color in [&COLOR_GREEN, &COLOR_RED, &COLOR_YELLOW, &COLOR_BLUE, &COLOR_GRAY] {
+    for color in [
+        &COLOR_GREEN,
+        &COLOR_RED,
+        &COLOR_YELLOW,
+        &COLOR_BLUE,
+        &COLOR_GRAY,
+    ] {
         let buf = create_status_icon_rgba(color);
         let (_, _, _, a) = pixel(&buf, 32, 32);
         assert_eq!(a, 255, "centre should be opaque for every colour");
@@ -124,10 +136,16 @@ fn test_green_and_red_icons_differ() {
 
 #[test]
 fn test_all_five_icons_are_distinct() {
-    let bufs: Vec<Vec<u8>> = [&COLOR_GREEN, &COLOR_RED, &COLOR_YELLOW, &COLOR_BLUE, &COLOR_GRAY]
-        .iter()
-        .map(|c| create_status_icon_rgba(c))
-        .collect();
+    let bufs: Vec<Vec<u8>> = [
+        &COLOR_GREEN,
+        &COLOR_RED,
+        &COLOR_YELLOW,
+        &COLOR_BLUE,
+        &COLOR_GRAY,
+    ]
+    .iter()
+    .map(|c| create_status_icon_rgba(c))
+    .collect();
 
     for i in 0..bufs.len() {
         for j in (i + 1)..bufs.len() {

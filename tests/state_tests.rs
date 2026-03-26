@@ -86,7 +86,11 @@ fn test_all_state_colors_are_distinct() {
 
     for i in 0..colors.len() {
         for j in (i + 1)..colors.len() {
-            assert_ne!(colors[i], colors[j], "States {} and {} share a colour", i, j);
+            assert_ne!(
+                colors[i], colors[j],
+                "States {} and {} share a colour",
+                i, j
+            );
         }
     }
 }

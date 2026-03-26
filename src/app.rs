@@ -17,10 +17,8 @@ use log::{error, info, warn};
 
 use crate::api::{country_to_iso, Location, VpnApi};
 use crate::config::AppConfig;
+use crate::daemon_ipc::{current_unix_ts, load_daemon_status, write_daemon_command, DaemonCommand};
 use crate::locale::{t, t_fmt};
-use crate::daemon_ipc::{
-    current_unix_ts, load_daemon_status, write_daemon_command, DaemonCommand,
-};
 use crate::system::SystemHandler;
 
 // --------------------------------------------------------------------------
@@ -171,25 +169,25 @@ fn windows_dark_visuals() -> egui::Visuals {
     use egui::{Color32, Rounding, Stroke, Visuals};
     let accent = Color32::from_rgb(0, 120, 212); // #0078D4 Windows blue
     let mut v = Visuals::dark();
-    v.window_rounding        = Rounding::same(8.0);
-    v.window_fill            = Color32::from_rgb(32, 32, 32);
-    v.panel_fill             = Color32::from_rgb(45, 45, 45);
-    v.window_stroke          = Stroke::new(1.0, Color32::from_rgb(60, 60, 60));
-    v.selection.bg_fill      = accent;
-    v.selection.stroke       = Stroke::new(1.0, Color32::WHITE);
-    v.hyperlink_color        = Color32::from_rgb(77, 166, 255);
+    v.window_rounding = Rounding::same(8.0);
+    v.window_fill = Color32::from_rgb(32, 32, 32);
+    v.panel_fill = Color32::from_rgb(45, 45, 45);
+    v.window_stroke = Stroke::new(1.0, Color32::from_rgb(60, 60, 60));
+    v.selection.bg_fill = accent;
+    v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
+    v.hyperlink_color = Color32::from_rgb(77, 166, 255);
     let r = Rounding::same(4.0);
-    v.widgets.noninteractive.rounding   = r;
-    v.widgets.inactive.rounding         = r;
-    v.widgets.inactive.weak_bg_fill     = Color32::from_rgb(62, 62, 62);
-    v.widgets.inactive.bg_fill          = Color32::from_rgb(62, 62, 62);
-    v.widgets.hovered.rounding          = r;
-    v.widgets.hovered.weak_bg_fill      = Color32::from_rgb(75, 75, 75);
-    v.widgets.hovered.bg_fill           = Color32::from_rgb(75, 75, 75);
-    v.widgets.active.rounding           = r;
-    v.widgets.active.weak_bg_fill       = Color32::from_rgb(90, 90, 90);
-    v.widgets.active.bg_fill            = Color32::from_rgb(90, 90, 90);
-    v.widgets.open.rounding             = r;
+    v.widgets.noninteractive.rounding = r;
+    v.widgets.inactive.rounding = r;
+    v.widgets.inactive.weak_bg_fill = Color32::from_rgb(62, 62, 62);
+    v.widgets.inactive.bg_fill = Color32::from_rgb(62, 62, 62);
+    v.widgets.hovered.rounding = r;
+    v.widgets.hovered.weak_bg_fill = Color32::from_rgb(75, 75, 75);
+    v.widgets.hovered.bg_fill = Color32::from_rgb(75, 75, 75);
+    v.widgets.active.rounding = r;
+    v.widgets.active.weak_bg_fill = Color32::from_rgb(90, 90, 90);
+    v.widgets.active.bg_fill = Color32::from_rgb(90, 90, 90);
+    v.widgets.open.rounding = r;
     v
 }
 
@@ -198,25 +196,25 @@ fn windows_light_visuals() -> egui::Visuals {
     use egui::{Color32, Rounding, Stroke, Visuals};
     let accent = Color32::from_rgb(0, 120, 212);
     let mut v = Visuals::light();
-    v.window_rounding        = Rounding::same(8.0);
-    v.window_fill            = Color32::from_rgb(243, 243, 243);
-    v.panel_fill             = Color32::from_rgb(255, 255, 255);
-    v.window_stroke          = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
-    v.selection.bg_fill      = accent;
-    v.selection.stroke       = Stroke::new(1.0, Color32::WHITE);
-    v.hyperlink_color        = accent;
+    v.window_rounding = Rounding::same(8.0);
+    v.window_fill = Color32::from_rgb(243, 243, 243);
+    v.panel_fill = Color32::from_rgb(255, 255, 255);
+    v.window_stroke = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
+    v.selection.bg_fill = accent;
+    v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
+    v.hyperlink_color = accent;
     let r = Rounding::same(4.0);
-    v.widgets.noninteractive.rounding   = r;
-    v.widgets.inactive.rounding         = r;
-    v.widgets.inactive.weak_bg_fill     = Color32::from_rgb(230, 230, 230);
-    v.widgets.inactive.bg_fill          = Color32::from_rgb(230, 230, 230);
-    v.widgets.hovered.rounding          = r;
-    v.widgets.hovered.weak_bg_fill      = Color32::from_rgb(214, 214, 214);
-    v.widgets.hovered.bg_fill           = Color32::from_rgb(214, 214, 214);
-    v.widgets.active.rounding           = r;
-    v.widgets.active.weak_bg_fill       = Color32::from_rgb(200, 200, 200);
-    v.widgets.active.bg_fill            = Color32::from_rgb(200, 200, 200);
-    v.widgets.open.rounding             = r;
+    v.widgets.noninteractive.rounding = r;
+    v.widgets.inactive.rounding = r;
+    v.widgets.inactive.weak_bg_fill = Color32::from_rgb(230, 230, 230);
+    v.widgets.inactive.bg_fill = Color32::from_rgb(230, 230, 230);
+    v.widgets.hovered.rounding = r;
+    v.widgets.hovered.weak_bg_fill = Color32::from_rgb(214, 214, 214);
+    v.widgets.hovered.bg_fill = Color32::from_rgb(214, 214, 214);
+    v.widgets.active.rounding = r;
+    v.widgets.active.weak_bg_fill = Color32::from_rgb(200, 200, 200);
+    v.widgets.active.bg_fill = Color32::from_rgb(200, 200, 200);
+    v.widgets.open.rounding = r;
     v
 }
 
@@ -248,11 +246,9 @@ pub fn run_settings_window() {
         ..Default::default()
     };
 
-    run_native_with_fallback(
-        &title,
-        options,
-        move || Box::new(SettingsWindow::new(first_run)),
-    );
+    run_native_with_fallback(&title, options, move || {
+        Box::new(SettingsWindow::new(first_run))
+    });
 }
 
 /// About dialog.
@@ -291,11 +287,7 @@ pub fn run_status_window() {
         ..Default::default()
     };
 
-    run_native_with_fallback(
-        &title,
-        options,
-        || Box::new(StatusWindow::new()),
-    );
+    run_native_with_fallback(&title, options, || Box::new(StatusWindow::new()));
 }
 
 /// Location picker dialog.
@@ -314,11 +306,7 @@ pub fn run_location_window() {
         ..Default::default()
     };
 
-    run_native_with_fallback(
-        &title,
-        options,
-        || Box::new(LocationWindow::new()),
-    );
+    run_native_with_fallback(&title, options, || Box::new(LocationWindow::new()));
 }
 
 // --------------------------------------------------------------------------
@@ -383,9 +371,10 @@ impl SettingsWindow {
             auto_reconnect: cfg.auto_reconnect,
             #[cfg(target_os = "windows")]
             run_on_startup: crate::autostart::AutoStartManager::is_enabled(),
-            language: cfg.language.clone().unwrap_or_else(|| {
-                crate::locale::active_language().to_string()
-            }),
+            language: cfg
+                .language
+                .clone()
+                .unwrap_or_else(|| crate::locale::active_language().to_string()),
             last_resolved_url: cfg.switcher_url.unwrap_or_default(),
             resolving: false,
             resolve_rx: None,
@@ -405,12 +394,9 @@ impl eframe::App for SettingsWindow {
         }
 
         // Trigger VPN IP auto-resolve when the switcher URL changes.
-        let url_valid = self.switcher_url.starts_with("http://")
-            || self.switcher_url.starts_with("https://");
-        if url_valid
-            && self.switcher_url != self.last_resolved_url
-            && !self.resolving
-        {
+        let url_valid =
+            self.switcher_url.starts_with("http://") || self.switcher_url.starts_with("https://");
+        if url_valid && self.switcher_url != self.last_resolved_url && !self.resolving {
             let (tx, rx) = std::sync::mpsc::sync_channel(1);
             let url = self.switcher_url.clone();
             std::thread::spawn(move || {
@@ -463,13 +449,14 @@ impl eframe::App for SettingsWindow {
                 .spacing([8.0, 6.0])
                 .show(ui, |ui| {
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_url"));
-                    ui.add(egui::TextEdit::singleline(&mut self.switcher_url)
-                        .desired_width(175.0));
+                    ui.add(egui::TextEdit::singleline(&mut self.switcher_url).desired_width(175.0));
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_vpn_ip"));
                     ui.horizontal(|ui| {
                         self.vpn_gateway.show(ui, "vpn_gw");
-                        if self.resolving { ui.spinner(); }
+                        if self.resolving {
+                            ui.spinner();
+                        }
                     });
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_router_ip"));
@@ -504,7 +491,11 @@ impl eframe::App for SettingsWindow {
             if !self.test_results.is_empty() {
                 section_header(ui, "");
                 for (label, ok) in &self.test_results {
-                    let color = if *ok { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
+                    let color = if *ok {
+                        egui::Color32::LIGHT_GREEN
+                    } else {
+                        egui::Color32::LIGHT_RED
+                    };
                     let prefix = if *ok { "✓" } else { "✗" };
                     ui.colored_label(color, format!("{prefix}  {label}"));
                 }
@@ -512,17 +503,26 @@ impl eframe::App for SettingsWindow {
 
             if let Some(ref msg) = self.message.clone() {
                 ui.add_space(4.0);
-                let color = if self.saved { egui::Color32::LIGHT_GREEN } else { egui::Color32::LIGHT_RED };
+                let color = if self.saved {
+                    egui::Color32::LIGHT_GREEN
+                } else {
+                    egui::Color32::LIGHT_RED
+                };
                 ui.colored_label(color, msg);
             }
 
             ui.add_space(8.0);
             let busy = self.testing || self.resolving;
             ui.horizontal(|ui| {
-                if ui.add_enabled(!busy, egui::Button::new(t("settings.btn_test"))).clicked() {
+                if ui
+                    .add_enabled(!busy, egui::Button::new(t("settings.btn_test")))
+                    .clicked()
+                {
                     self.start_test();
                 }
-                if self.testing { ui.spinner(); }
+                if self.testing {
+                    ui.spinner();
+                }
                 if ui.button(t("settings.btn_save")).clicked() {
                     self.try_save(ctx);
                 }
@@ -562,8 +562,8 @@ impl SettingsWindow {
         let language_changed = cfg.language.as_deref() != Some(self.language.as_str());
 
         let ip_valid = self.vpn_gateway.is_valid() && self.isp_gateway.is_valid();
-        let url_valid = !url.is_empty()
-            && (url.starts_with("http://") || url.starts_with("https://"));
+        let url_valid =
+            !url.is_empty() && (url.starts_with("http://") || url.starts_with("https://"));
 
         // If network fields are incomplete but the language changed, save just
         // the language and restart so the user can continue setup in their language.
@@ -645,10 +645,15 @@ impl eframe::App for StatusWindow {
             if let Some(status) = load_daemon_status() {
                 let (state_color, state_text) = match status.state.as_str() {
                     "Connected" => (egui::Color32::LIGHT_GREEN, t("status_win.state_connected")),
-                    "Enabling" => (egui::Color32::from_rgb(0x00, 0x7A, 0xCC), t("status_win.state_connecting")),
+                    "Enabling" => (
+                        egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
+                        t("status_win.state_connecting"),
+                    ),
                     "Dropped" => (egui::Color32::LIGHT_RED, t("status_win.state_dropped")),
                     "ServerUnreachable" => (egui::Color32::GRAY, t("status_win.state_unreachable")),
-                    "SetupIncomplete" => (egui::Color32::GRAY, t("status_win.state_setup_incomplete")),
+                    "SetupIncomplete" => {
+                        (egui::Color32::GRAY, t("status_win.state_setup_incomplete"))
+                    }
                     _ => (egui::Color32::YELLOW, t("status_win.state_disabled")),
                 };
 
@@ -1053,11 +1058,16 @@ impl IpInput {
     }
 
     fn to_ip_string(&self) -> String {
-        format!("{}.{}.{}.{}", self.octets[0], self.octets[1], self.octets[2], self.octets[3])
+        format!(
+            "{}.{}.{}.{}",
+            self.octets[0], self.octets[1], self.octets[2], self.octets[3]
+        )
     }
 
     fn is_valid(&self) -> bool {
-        self.octets.iter().all(|o| !o.is_empty() && o.parse::<u8>().is_ok())
+        self.octets
+            .iter()
+            .all(|o| !o.is_empty() && o.parse::<u8>().is_ok())
     }
 
     /// Render four narrow octet fields separated by dots.
@@ -1167,9 +1177,16 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
     // 2. VPN Server IP - ping.
     if vpn_ip.split('.').count() == 4 && !vpn_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&vpn_ip);
-        let status_str = if ok { t("test.reachable") } else { t("test.unreachable") };
+        let status_str = if ok {
+            t("test.reachable")
+        } else {
+            t("test.unreachable")
+        };
         results.push((
-            t_fmt("test.vpn_server", &[("ip", &vpn_ip), ("status", &status_str)]),
+            t_fmt(
+                "test.vpn_server",
+                &[("ip", &vpn_ip), ("status", &status_str)],
+            ),
             ok,
         ));
     } else {
@@ -1179,9 +1196,16 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
     // 3. Router IP - ping.
     if router_ip.split('.').count() == 4 && !router_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&router_ip);
-        let status_str = if ok { t("test.reachable") } else { t("test.unreachable") };
+        let status_str = if ok {
+            t("test.reachable")
+        } else {
+            t("test.unreachable")
+        };
         results.push((
-            t_fmt("test.router", &[("ip", &router_ip), ("status", &status_str)]),
+            t_fmt(
+                "test.router",
+                &[("ip", &router_ip), ("status", &status_str)],
+            ),
             ok,
         ));
     } else {
@@ -1235,13 +1259,9 @@ impl eframe::App for AboutWindow {
             if let Ok(img) = image::load_from_memory(bytes) {
                 let rgba = img.to_rgba8();
                 let size = [rgba.width() as usize, rgba.height() as usize];
-                let color_image =
-                    egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
-                self.logo = Some(ctx.load_texture(
-                    "about_logo",
-                    color_image,
-                    egui::TextureOptions::LINEAR,
-                ));
+                let color_image = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+                self.logo =
+                    Some(ctx.load_texture("about_logo", color_image, egui::TextureOptions::LINEAR));
             }
         }
 
@@ -1286,10 +1306,7 @@ impl eframe::App for AboutWindow {
                         GITHUB_URL,
                     ));
                     ui.add_space(4.0);
-                    ui.add(egui::Hyperlink::from_label_and_url(
-                        "☕  Ko-fi",
-                        KOFI_URL,
-                    ));
+                    ui.add(egui::Hyperlink::from_label_and_url("☕  Ko-fi", KOFI_URL));
 
                     ui.add_space(12.0);
                     ui.separator();
@@ -1300,9 +1317,7 @@ impl eframe::App for AboutWindow {
                     ui.add_space(4.0);
                     ui.add(
                         egui::Label::new(
-                            egui::RichText::new(BITCOIN_ADDRESS)
-                                .monospace()
-                                .size(11.0),
+                            egui::RichText::new(BITCOIN_ADDRESS).monospace().size(11.0),
                         )
                         .selectable(true),
                     );

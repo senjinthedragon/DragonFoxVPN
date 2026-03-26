@@ -91,7 +91,9 @@ impl VpnApi {
                                 url = resolve_redirect(&url, loc);
                                 continue;
                             }
-                            None => return Err(format!("Redirect {status} with no Location header")),
+                            None => {
+                                return Err(format!("Redirect {status} with no Location header"))
+                            }
                         }
                     }
 
@@ -122,9 +124,7 @@ impl VpnApi {
                             log::info!("switch_location: redirect {code} → {loc}");
                             url = resolve_redirect(&url, loc);
                         }
-                        None => {
-                            return Err(format!("Redirect {code} with no Location header"))
-                        }
+                        None => return Err(format!("Redirect {code} with no Location header")),
                     }
                 }
                 Err(e) => {
@@ -176,7 +176,11 @@ pub fn extract_php_error(html: &str) -> Option<String> {
     let sel = Selector::parse(".error strong").ok()?;
     let text: String = doc.select(&sel).next()?.text().collect();
     let trimmed = text.trim().to_string();
-    if trimmed.is_empty() { None } else { Some(trimmed) }
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed)
+    }
 }
 
 pub fn parse_locations(html: &str) -> (Vec<Location>, Option<String>) {

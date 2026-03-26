@@ -26,7 +26,6 @@ use tray_icon::{
 };
 
 use dragonfox_vpn::config::AppConfig;
-use dragonfox_vpn::locale::{t, t_fmt};
 use dragonfox_vpn::daemon_ipc::{
     clear_daemon_command, current_unix_ts, save_daemon_status, take_daemon_command, DaemonCommand,
     DaemonStatus,
@@ -34,6 +33,7 @@ use dragonfox_vpn::daemon_ipc::{
 use dragonfox_vpn::icons::{
     create_status_icon_rgba, COLOR_BLUE, COLOR_GRAY, COLOR_GREEN, COLOR_RED, COLOR_YELLOW,
 };
+use dragonfox_vpn::locale::{t, t_fmt};
 use dragonfox_vpn::state::VpnState;
 use dragonfox_vpn::system::SystemHandler;
 use dragonfox_vpn::vpn_runtime;
@@ -83,7 +83,8 @@ fn emergency_vpn_restore() {
 // --------------------------------------------------------------------------
 
 fn main() {
-    let mut logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    let mut logger =
+        env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
     logger.format_timestamp_secs();
     logger.init();
 
@@ -253,11 +254,23 @@ fn run_tray_daemon() {
             use std::ffi::c_void;
             #[repr(C)]
             struct Msg {
-                hwnd: *mut c_void, message: u32, w_param: usize,
-                l_param: isize, time: u32, pt_x: i32, pt_y: i32, _private: u32,
+                hwnd: *mut c_void,
+                message: u32,
+                w_param: usize,
+                l_param: isize,
+                time: u32,
+                pt_x: i32,
+                pt_y: i32,
+                _private: u32,
             }
             extern "system" {
-                fn PeekMessageW(lp: *mut Msg, hwnd: *mut c_void, min: u32, max: u32, remove: u32) -> i32;
+                fn PeekMessageW(
+                    lp: *mut Msg,
+                    hwnd: *mut c_void,
+                    min: u32,
+                    max: u32,
+                    remove: u32,
+                ) -> i32;
                 fn TranslateMessage(lp: *const Msg) -> i32;
                 fn DispatchMessageW(lp: *const Msg) -> isize;
             }
@@ -289,7 +302,10 @@ fn run_tray_daemon() {
             } else {
                 // Restore each item to its correct state.
                 items.dashboard.set_enabled(true);
-                items.settings.set_enabled(!matches!(vpn_state, VpnState::Connected | VpnState::Enabling));
+                items.settings.set_enabled(!matches!(
+                    vpn_state,
+                    VpnState::Connected | VpnState::Enabling
+                ));
                 items.about.set_enabled(true);
                 items.exit.set_enabled(true);
                 let setup_done = config.setup_complete;
@@ -298,7 +314,9 @@ fn run_tray_daemon() {
                 } else {
                     t("tray.enable_vpn")
                 });
-                items.toggle.set_enabled(setup_done && vpn_state != VpnState::Enabling);
+                items
+                    .toggle
+                    .set_enabled(setup_done && vpn_state != VpnState::Enabling);
                 items.location.set_enabled(setup_done);
             }
             dialog_was_open = dialog_open;
@@ -346,9 +364,7 @@ fn run_tray_daemon() {
                         } else {
                             t("tray.enable_vpn")
                         });
-                        items.toggle.set_enabled(
-                            vpn_state != VpnState::Enabling,
-                        );
+                        items.toggle.set_enabled(vpn_state != VpnState::Enabling);
                         items.location.set_enabled(true);
                         items.settings.set_enabled(true);
                         daemon_status.state = if vpn_state == VpnState::Disabled {
@@ -656,10 +672,7 @@ enum HcEvent {
     AutoReconnect,
 }
 
-fn health_check_loop(
-    _cfg_path: std::path::PathBuf,
-    tx: std::sync::mpsc::Sender<HcEvent>,
-) {
+fn health_check_loop(_cfg_path: std::path::PathBuf, tx: std::sync::mpsc::Sender<HcEvent>) {
     let mut drop_count: u32 = 0;
     let mut location_tick: u32 = 0;
 
@@ -677,8 +690,7 @@ fn health_check_loop(
             if let Some(url) = config.switcher_url {
                 let tx2 = tx.clone();
                 std::thread::spawn(move || {
-                    if let Ok((_, Some(label))) =
-                        dragonfox_vpn::api::VpnApi::fetch_locations(&url)
+                    if let Ok((_, Some(label))) = dragonfox_vpn::api::VpnApi::fetch_locations(&url)
                     {
                         let _ = tx2.send(HcEvent::LocationFetched(label));
                     }
@@ -725,7 +737,9 @@ fn health_check_loop(
                 SystemHandler::kill_switch_delete_route(&vpn_gw, &adapter);
                 SystemHandler::flush_dns();
                 drop_count = 0;
-                let _ = tx.send(HcEvent::Dropped { kill_switched: true });
+                let _ = tx.send(HcEvent::Dropped {
+                    kill_switched: true,
+                });
             }
         } else if !result.route_exists {
             drop_count = 0;
@@ -734,7 +748,9 @@ fn health_check_loop(
                 if config.auto_reconnect {
                     let _ = tx.send(HcEvent::AutoReconnect);
                 } else {
-                    let _ = tx.send(HcEvent::Dropped { kill_switched: false });
+                    let _ = tx.send(HcEvent::Dropped {
+                        kill_switched: false,
+                    });
                 }
             } else {
                 let _ = tx.send(HcEvent::Unreachable);
@@ -828,9 +844,24 @@ fn handle_hc_event(
                 info!("Auto-reconnect: VPN server is back, re-enabling VPN.");
                 set_vpn_enabling(tray, items, vpn_state, status);
                 if do_enable_vpn(adapter, config) {
-                    set_vpn_connected(tray, items, vpn_state, connected_since, status, config, Some(t("status.auto_reconnected")));
+                    set_vpn_connected(
+                        tray,
+                        items,
+                        vpn_state,
+                        connected_since,
+                        status,
+                        config,
+                        Some(t("status.auto_reconnected")),
+                    );
                 } else {
-                    set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(t("status.auto_reconnect_failed")));
+                    set_vpn_dropped(
+                        tray,
+                        items,
+                        vpn_state,
+                        connected_since,
+                        status,
+                        Some(t("status.auto_reconnect_failed")),
+                    );
                 }
             }
         }
@@ -862,7 +893,15 @@ fn handle_menu_event(
         } else {
             set_vpn_enabling(tray, items, vpn_state, daemon_status);
             if do_enable_vpn(adapter, config) {
-                set_vpn_connected(tray, items, vpn_state, connected_since, daemon_status, config, None);
+                set_vpn_connected(
+                    tray,
+                    items,
+                    vpn_state,
+                    connected_since,
+                    daemon_status,
+                    config,
+                    None,
+                );
             } else {
                 set_vpn_failed(tray, items, vpn_state, daemon_status);
             }
@@ -932,10 +971,9 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&exit);
 
     let initial_rgba = create_status_icon_rgba(&COLOR_YELLOW);
-    let initial_icon = tray_icon::Icon::from_rgba(initial_rgba, 64, 64)
-        .unwrap_or_else(|_| {
-            tray_icon::Icon::from_rgba(vec![0xFF, 0xC1, 0x07, 0xFF], 1, 1).unwrap()
-        });
+    let initial_icon = tray_icon::Icon::from_rgba(initial_rgba, 64, 64).unwrap_or_else(|_| {
+        tray_icon::Icon::from_rgba(vec![0xFF, 0xC1, 0x07, 0xFF], 1, 1).unwrap()
+    });
 
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
@@ -960,7 +998,12 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
 // Tray icon colour
 // --------------------------------------------------------------------------
 
-fn update_tray_icon(tray: &TrayIcon, items: &MenuItems, vpn_state: &VpnState, location: Option<&str>) {
+fn update_tray_icon(
+    tray: &TrayIcon,
+    items: &MenuItems,
+    vpn_state: &VpnState,
+    location: Option<&str>,
+) {
     let color = match vpn_state {
         VpnState::Connected => &COLOR_GREEN,
         VpnState::Dropped => &COLOR_RED,

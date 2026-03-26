@@ -49,8 +49,7 @@ pub fn get_flags_dir() -> PathBuf {
 }
 
 /// Persistent user configuration - JSON-compatible with the Python version.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     #[serde(default)]
     pub favorites: Vec<String>,
@@ -74,7 +73,6 @@ pub struct AppConfig {
     #[serde(default)]
     pub language: Option<String>,
 }
-
 
 impl AppConfig {
     /// Load config from disk, returning defaults on any failure.

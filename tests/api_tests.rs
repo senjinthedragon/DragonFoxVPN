@@ -5,8 +5,8 @@
 // See LICENSE for full license information.
 
 use dragonfox_vpn::api::{
-    country_to_iso, ensure_trailing_slash, extract_php_error, parse_locations,
-    resolve_redirect, strip_continent_emojis, strip_country_emojis,
+    country_to_iso, ensure_trailing_slash, extract_php_error, parse_locations, resolve_redirect,
+    strip_continent_emojis, strip_country_emojis,
 };
 
 // ---------------------------------------------------------------------------
@@ -209,7 +209,10 @@ fn test_strip_country_emojis_removes_flag() {
 
 #[test]
 fn test_strip_country_emojis_plain_text_unchanged() {
-    assert_eq!(strip_country_emojis("Germany - Frankfurt"), "Germany - Frankfurt");
+    assert_eq!(
+        strip_country_emojis("Germany - Frankfurt"),
+        "Germany - Frankfurt"
+    );
 }
 
 #[test]
@@ -225,19 +228,34 @@ fn test_strip_country_emojis_multiple_flags() {
 
 #[test]
 fn test_trailing_slash_added_when_no_path() {
-    assert_eq!(ensure_trailing_slash("http://10.0.0.20"), "http://10.0.0.20/");
-    assert_eq!(ensure_trailing_slash("https://vpn.example.com"), "https://vpn.example.com/");
+    assert_eq!(
+        ensure_trailing_slash("http://10.0.0.20"),
+        "http://10.0.0.20/"
+    );
+    assert_eq!(
+        ensure_trailing_slash("https://vpn.example.com"),
+        "https://vpn.example.com/"
+    );
 }
 
 #[test]
 fn test_trailing_slash_not_duplicated() {
-    assert_eq!(ensure_trailing_slash("http://10.0.0.20/"), "http://10.0.0.20/");
+    assert_eq!(
+        ensure_trailing_slash("http://10.0.0.20/"),
+        "http://10.0.0.20/"
+    );
 }
 
 #[test]
 fn test_trailing_slash_not_added_when_path_present() {
-    assert_eq!(ensure_trailing_slash("http://10.0.0.20/switch"), "http://10.0.0.20/switch");
-    assert_eq!(ensure_trailing_slash("https://vpn.example.com/vpn/"), "https://vpn.example.com/vpn/");
+    assert_eq!(
+        ensure_trailing_slash("http://10.0.0.20/switch"),
+        "http://10.0.0.20/switch"
+    );
+    assert_eq!(
+        ensure_trailing_slash("https://vpn.example.com/vpn/"),
+        "https://vpn.example.com/vpn/"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -271,10 +289,7 @@ fn test_resolve_redirect_absolute_path_uses_current_host() {
 #[test]
 fn test_resolve_redirect_relative_path_returned_as_is() {
     // Relative paths (no leading slash, no scheme) are passed through unchanged.
-    assert_eq!(
-        resolve_redirect("http://10.0.0.20/", "switch"),
-        "switch"
-    );
+    assert_eq!(resolve_redirect("http://10.0.0.20/", "switch"), "switch");
 }
 
 // ---------------------------------------------------------------------------
@@ -289,8 +304,12 @@ fn test_extract_php_error_returns_none_when_absent() {
 
 #[test]
 fn test_extract_php_error_finds_error_message() {
-    let html = "<html><body><p class='error'><strong>Invalid location value</strong></p></body></html>";
-    assert_eq!(extract_php_error(html).as_deref(), Some("Invalid location value"));
+    let html =
+        "<html><body><p class='error'><strong>Invalid location value</strong></p></body></html>";
+    assert_eq!(
+        extract_php_error(html).as_deref(),
+        Some("Invalid location value")
+    );
 }
 
 #[test]

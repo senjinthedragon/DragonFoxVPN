@@ -50,8 +50,8 @@ fn system_locale() -> String {
     {
         use winreg::enums::HKEY_CURRENT_USER;
         use winreg::RegKey;
-        if let Ok(key) = RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey("Control Panel\\International")
+        if let Ok(key) =
+            RegKey::predef(HKEY_CURRENT_USER).open_subkey("Control Panel\\International")
         {
             if let Ok(name) = key.get_value::<String, _>("LocaleName") {
                 return name; // e.g. "de-DE" or "zh-CN"
@@ -71,22 +71,31 @@ fn system_locale() -> String {
 
 fn locale_to_lang(locale: &str) -> String {
     let l = locale.to_lowercase();
-    if l.starts_with("zh") { "zh_CN".to_string() }
-    else if l.starts_with("ja") { "ja".to_string() }
-    else if l.starts_with("ko") { "ko".to_string() }
-    else if l.starts_with("de") { "de".to_string() }
-    else if l.starts_with("fr") { "fr".to_string() }
-    else if l.starts_with("es") { "es".to_string() }
-    else if l.starts_with("pt") { "pt_BR".to_string() }
-    else if l.starts_with("ru") { "ru".to_string() }
-    else if l.starts_with("it") { "it".to_string() }
-    else { "en".to_string() }
+    if l.starts_with("zh") {
+        "zh_CN".to_string()
+    } else if l.starts_with("ja") {
+        "ja".to_string()
+    } else if l.starts_with("ko") {
+        "ko".to_string()
+    } else if l.starts_with("de") {
+        "de".to_string()
+    } else if l.starts_with("fr") {
+        "fr".to_string()
+    } else if l.starts_with("es") {
+        "es".to_string()
+    } else if l.starts_with("pt") {
+        "pt_BR".to_string()
+    } else if l.starts_with("ru") {
+        "ru".to_string()
+    } else if l.starts_with("it") {
+        "it".to_string()
+    } else {
+        "en".to_string()
+    }
 }
 
 fn detected_language() -> &'static str {
-    DETECTED_LANG.get()
-        .map(|s| s.as_str())
-        .unwrap_or("en")
+    DETECTED_LANG.get().map(|s| s.as_str()).unwrap_or("en")
 }
 
 /// Returns the active language code (e.g. "de", "zh_CN").
@@ -97,16 +106,19 @@ pub fn active_language() -> &'static str {
 /// All supported languages as (code, display name) pairs, in display order.
 pub fn available_languages() -> &'static [(&'static str, &'static str)] {
     &[
-        ("en",    "English"),
-        ("de",    "Deutsch"),
-        ("fr",    "Fran\u{00e7}ais"),
-        ("es",    "Espa\u{00f1}ol"),
+        ("en", "English"),
+        ("de", "Deutsch"),
+        ("fr", "Fran\u{00e7}ais"),
+        ("es", "Espa\u{00f1}ol"),
         ("pt_BR", "Portugu\u{00ea}s (Brasil)"),
-        ("it",    "Italiano"),
-        ("ru",    "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}"),
+        ("it", "Italiano"),
+        (
+            "ru",
+            "\u{0420}\u{0443}\u{0441}\u{0441}\u{043a}\u{0438}\u{0439}",
+        ),
         ("zh_CN", "\u{4e2d}\u{6587} (\u{7b80}\u{4f53})"),
-        ("ja",    "\u{65e5}\u{672c}\u{8a9e}"),
-        ("ko",    "\u{d55c}\u{ad6d}\u{c5b4}"),
+        ("ja", "\u{65e5}\u{672c}\u{8a9e}"),
+        ("ko", "\u{d55c}\u{ad6d}\u{c5b4}"),
     ]
 }
 
@@ -117,7 +129,10 @@ pub fn init() {
     let saved = crate::config::AppConfig::load().language;
     let lang = if let Some(ref code) = saved {
         // Validate the saved code is one we actually support.
-        if available_languages().iter().any(|(c, _)| *c == code.as_str()) {
+        if available_languages()
+            .iter()
+            .any(|(c, _)| *c == code.as_str())
+        {
             code.clone()
         } else {
             locale_to_lang(&system_locale())
@@ -210,9 +225,9 @@ fn find_cjk_font(lang: &str) -> Option<std::path::PathBuf> {
         // Language-specific preferred fonts first, then universal fallbacks.
         let candidates: &[&str] = match lang {
             "zh_CN" => &["msyh.ttc", "msyhbd.ttc", "simhei.ttf", "simsun.ttc"],
-            "ja"    => &["meiryo.ttc", "YuGothR.ttc", "msgothic.ttc"],
-            "ko"    => &["malgun.ttf", "gulim.ttc"],
-            _       => &["msyh.ttc", "meiryo.ttc", "malgun.ttf", "simsun.ttc"],
+            "ja" => &["meiryo.ttc", "YuGothR.ttc", "msgothic.ttc"],
+            "ko" => &["malgun.ttf", "gulim.ttc"],
+            _ => &["msyh.ttc", "meiryo.ttc", "malgun.ttf", "simsun.ttc"],
         };
         for name in candidates {
             let p = fonts_dir.join(name);
@@ -234,9 +249,9 @@ fn find_cjk_font(lang: &str) -> Option<std::path::PathBuf> {
         // Language-specific extras tried first, then fall through to universal.
         let extras: &[&str] = match lang {
             "zh_CN" => &["/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf"],
-            "ja"    => &["/usr/share/fonts/truetype/noto/NotoSansCJKjp-Regular.otf"],
-            "ko"    => &["/usr/share/fonts/truetype/noto/NotoSansCJKkr-Regular.otf"],
-            _       => &[],
+            "ja" => &["/usr/share/fonts/truetype/noto/NotoSansCJKjp-Regular.otf"],
+            "ko" => &["/usr/share/fonts/truetype/noto/NotoSansCJKkr-Regular.otf"],
+            _ => &[],
         };
         for path in extras.iter().chain(universal.iter()) {
             let p = std::path::Path::new(path);

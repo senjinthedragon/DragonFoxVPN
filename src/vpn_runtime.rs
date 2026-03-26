@@ -58,5 +58,9 @@ pub fn check_health(adapter: &str, vpn_gateway: &str, isp_gateway: &str) -> Heal
     } else {
         false
     };
-    HealthCheck { vpn_active, route_exists, pi_reachable }
+    HealthCheck {
+        vpn_active,
+        route_exists,
+        pi_reachable,
+    }
 }

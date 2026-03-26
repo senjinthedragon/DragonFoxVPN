@@ -57,7 +57,12 @@ fn test_status_file_roundtrip() {
 
 #[test]
 fn test_daemon_command_serialization_roundtrip() {
-    for cmd in [DaemonCommand::Reconnect, DaemonCommand::ReloadConfig, DaemonCommand::Restart, DaemonCommand::Quit] {
+    for cmd in [
+        DaemonCommand::Reconnect,
+        DaemonCommand::ReloadConfig,
+        DaemonCommand::Restart,
+        DaemonCommand::Quit,
+    ] {
         let json = serde_json::to_string(&cmd).expect("serialize command");
         let parsed: DaemonCommand = serde_json::from_str(&json).expect("deserialize command");
         assert_eq!(cmd, parsed, "roundtrip failed for {:?}", cmd);
