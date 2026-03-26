@@ -132,11 +132,13 @@ pub fn run_settings_window() {
         ..Default::default()
     };
 
-    let _ = eframe::run_native(
+    if let Err(e) = eframe::run_native(
         "DragonFoxVPN Settings",
         options,
         Box::new(move |_cc| Ok(Box::new(SettingsWindow::new(first_run)))),
-    );
+    ) {
+        log::error!("Failed to open settings window: {e}");
+    }
 }
 
 /// Status dashboard dialog.
@@ -154,11 +156,13 @@ pub fn run_status_window() {
         ..Default::default()
     };
 
-    let _ = eframe::run_native(
+    if let Err(e) = eframe::run_native(
         "DragonFoxVPN Status",
         options,
         Box::new(|_cc| Ok(Box::new(StatusWindow::new()))),
-    );
+    ) {
+        log::error!("Failed to open status window: {e}");
+    }
 }
 
 /// Location picker dialog.
@@ -176,11 +180,13 @@ pub fn run_location_window() {
         ..Default::default()
     };
 
-    let _ = eframe::run_native(
+    if let Err(e) = eframe::run_native(
         "DragonFoxVPN Location",
         options,
         Box::new(|_cc| Ok(Box::new(LocationWindow::new()))),
-    );
+    ) {
+        log::error!("Failed to open location window: {e}");
+    }
 }
 
 // --------------------------------------------------------------------------

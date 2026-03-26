@@ -222,11 +222,35 @@ fn run_tray_daemon() {
     let mut dialog_was_open = false;
 
     loop {
-        // Service GTK so the tray icon menu stays responsive.
+        // Service the platform event queue so the tray icon stays responsive.
         #[cfg(target_os = "linux")]
         {
             while gtk::events_pending() {
                 gtk::main_iteration_do(false);
+            }
+        }
+        // On Windows, pump the Win32 message queue so tray and menu events
+        // are dispatched. Without this the tray icon renders but all input
+        // is ignored.
+        #[cfg(target_os = "windows")]
+        {
+            use std::ffi::c_void;
+            #[repr(C)]
+            struct Msg {
+                hwnd: *mut c_void, message: u32, w_param: usize,
+                l_param: isize, time: u32, pt_x: i32, pt_y: i32, _private: u32,
+            }
+            extern "system" {
+                fn PeekMessageW(lp: *mut Msg, hwnd: *mut c_void, min: u32, max: u32, remove: u32) -> i32;
+                fn TranslateMessage(lp: *const Msg) -> i32;
+                fn DispatchMessageW(lp: *const Msg) -> isize;
+            }
+            unsafe {
+                let mut msg: Msg = std::mem::zeroed();
+                while PeekMessageW(&mut msg, std::ptr::null_mut(), 0, 0, 1) != 0 {
+                    TranslateMessage(&msg);
+                    DispatchMessageW(&msg);
+                }
             }
         }
 
