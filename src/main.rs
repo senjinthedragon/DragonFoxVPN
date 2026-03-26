@@ -121,6 +121,7 @@ fn main() {
             "settings" => dragonfox_vpn::app::run_settings_window(),
             "status" => dragonfox_vpn::app::run_status_window(),
             "location" => dragonfox_vpn::app::run_location_window(),
+            "about" => dragonfox_vpn::app::run_about_window(),
             _ => {}
         }
         return;
@@ -282,11 +283,13 @@ fn run_tray_daemon() {
                 items.toggle.set_enabled(false);
                 items.location.set_enabled(false);
                 items.settings.set_enabled(false);
+                items.about.set_enabled(false);
                 items.exit.set_enabled(false);
             } else {
                 // Restore each item to its correct state.
                 items.dashboard.set_enabled(true);
                 items.settings.set_enabled(true);
+                items.about.set_enabled(true);
                 items.exit.set_enabled(true);
                 let setup_done = config.setup_complete;
                 items.toggle.set_text(&if vpn_state == VpnState::Connected {
@@ -596,7 +599,7 @@ fn any_ui_open() -> bool {
         .parent()
         .unwrap_or_else(|| std::path::Path::new("."))
         .to_path_buf();
-    ["settings", "status", "location"]
+    ["settings", "status", "location", "about"]
         .iter()
         .any(|m| config_dir.join(format!("ui_{m}.lock")).exists())
 }
@@ -837,6 +840,8 @@ fn handle_menu_event(
         spawn_ui("location");
     } else if id == items.settings.id() {
         spawn_ui("settings");
+    } else if id == items.about.id() {
+        spawn_ui("about");
     } else if id == items.exit.id() {
         *should_exit = true;
     }
@@ -852,6 +857,7 @@ struct MenuItems {
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
     settings: MenuItem,
+    about: MenuItem,
     exit: MenuItem,
 }
 
@@ -875,6 +881,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let location = MenuItem::new(&t("tray.change_location"), setup_complete, None);
     let sep3 = PredefinedMenuItem::separator();
     let settings = MenuItem::new(&t("tray.settings"), true, None);
+    let about = MenuItem::new(&t("tray.about"), true, None);
     let sep4 = PredefinedMenuItem::separator();
     let exit = MenuItem::new(&t("tray.exit"), true, None);
 
@@ -889,6 +896,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&location);
     let _ = menu.append(&sep3);
     let _ = menu.append(&settings);
+    let _ = menu.append(&about);
     let _ = menu.append(&sep4);
     let _ = menu.append(&exit);
 
@@ -911,6 +919,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         toggle,
         location,
         settings,
+        about,
         exit,
     };
     (tray, items)

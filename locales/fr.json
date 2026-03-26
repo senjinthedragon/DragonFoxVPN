@@ -8,6 +8,7 @@
   "tray.autoreconnect": "Reconnexion auto si serveur disponible",
   "tray.run_on_startup": "D\u00e9marrer avec Windows",
   "tray.settings": "Param\u00e8tres...",
+  "tray.about": "À propos...",
   "tray.exit": "Quitter",
   "tray.connected_location": "Connect\u00e9 - {location}",
   "tray.dropped": "Connexion perdue",

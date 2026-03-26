@@ -8,6 +8,7 @@
   "tray.autoreconnect": "\u670d\u52a1\u5668\u6062\u590d\u65f6\u81ea\u52a8\u91cd\u8fde",
   "tray.run_on_startup": "\u5f00\u673a\u81ea\u542f",
   "tray.settings": "\u8bbe\u7f6e...",
+  "tray.about": "关于...",
   "tray.exit": "\u9000\u51fa",
   "tray.connected_location": "\u5df2\u8fde\u63a5 - {location}",
   "tray.dropped": "\u8fde\u63a5\u5df2\u65ad\u5f00",

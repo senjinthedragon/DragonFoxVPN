@@ -8,6 +8,7 @@
   "tray.autoreconnect": "\uc11c\ubc84 \ubcf5\uad6c \uc2dc \uc790\ub3d9 \uc7ac\uc5f0\uacb0",
   "tray.run_on_startup": "\uc2dc\uc791 \ud504\ub85c\uadf8\ub7a8\uc5d0 \ub4f1\ub85d",
   "tray.settings": "\uc124\uc815...",
+  "tray.about": "정보...",
   "tray.exit": "\uc885\ub8cc",
   "tray.connected_location": "\uc5f0\uacb0\ub428 - {location}",
   "tray.dropped": "\uc5f0\uacb0\uc774 \ub04a\uc5b4\uc84c\uc2b5\ub2c8\ub2e4",

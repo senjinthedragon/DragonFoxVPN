@@ -8,6 +8,7 @@
   "tray.autoreconnect": "Automatisch neu verbinden",
   "tray.run_on_startup": "Mit Windows starten",
   "tray.settings": "Einstellungen...",
+  "tray.about": "Über...",
   "tray.exit": "Beenden",
   "tray.connected_location": "Verbunden - {location}",
   "tray.dropped": "Verbindung unterbrochen",

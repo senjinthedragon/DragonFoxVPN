@@ -254,6 +254,25 @@ pub fn run_settings_window() {
     );
 }
 
+/// About dialog.
+pub fn run_about_window() {
+    let _lock = match acquire_ui_lock("about") {
+        Some(l) => l,
+        None => return,
+    };
+
+    let title = format!("DragonFoxVPN - {}", t("tray.about").trim_end_matches('.'));
+    let options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_title(&title)
+            .with_inner_size([360.0, 480.0])
+            .with_resizable(false),
+        ..Default::default()
+    };
+
+    run_native_with_fallback(&title, options, || Box::new(AboutWindow::new()));
+}
+
 /// Status dashboard dialog.
 pub fn run_status_window() {
     let _lock = match acquire_ui_lock("status") {
@@ -1174,6 +1193,115 @@ fn resolve_host_from_url(url: &str) -> Option<String> {
     let mut addrs = addr_str.to_socket_addrs().ok()?;
     let ip = addrs.next()?.ip().to_string();
     Some(ip)
+}
+
+// --------------------------------------------------------------------------
+// About window
+// --------------------------------------------------------------------------
+
+struct AboutWindow {
+    logo: Option<egui::TextureHandle>,
+}
+
+impl AboutWindow {
+    fn new() -> Self {
+        Self { logo: None }
+    }
+}
+
+const GITHUB_URL: &str = "https://github.com/sponsors/senjinthedragon/";
+const KOFI_URL: &str = "https://ko-fi.com/senjinthedragon";
+const BITCOIN_ADDRESS: &str = "bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9";
+
+impl eframe::App for AboutWindow {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Load and cache the logo texture on the first frame.
+        if self.logo.is_none() {
+            let bytes = include_bytes!("../assets/senjin_logo.png");
+            if let Ok(img) = image::load_from_memory(bytes) {
+                let rgba = img.to_rgba8();
+                let size = [rgba.width() as usize, rgba.height() as usize];
+                let color_image =
+                    egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+                self.logo = Some(ctx.load_texture(
+                    "about_logo",
+                    color_image,
+                    egui::TextureOptions::LINEAR,
+                ));
+            }
+        }
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(12.0);
+
+                    // Logo
+                    if let Some(tex) = &self.logo {
+                        ui.add(egui::Image::new((tex.id(), egui::vec2(119.0, 128.0))));
+                        ui.add_space(10.0);
+                    }
+
+                    // Title and version
+                    ui.colored_label(
+                        egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
+                        egui::RichText::new("DragonFoxVPN").size(26.0).strong(),
+                    );
+                    ui.label(
+                        egui::RichText::new(concat!("Version ", env!("CARGO_PKG_VERSION")))
+                            .size(13.0)
+                            .color(egui::Color32::GRAY),
+                    );
+                    ui.add_space(8.0);
+
+                    ui.label("© 2026 Senjin the Dragon");
+                    ui.label(
+                        egui::RichText::new("Released under the MIT License")
+                            .color(egui::Color32::GRAY),
+                    );
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Support links
+                    ui.label(egui::RichText::new("Support Development").strong());
+                    ui.add_space(6.0);
+                    ui.add(egui::Hyperlink::from_label_and_url(
+                        "⭐  GitHub Sponsors",
+                        GITHUB_URL,
+                    ));
+                    ui.add_space(4.0);
+                    ui.add(egui::Hyperlink::from_label_and_url(
+                        "☕  Ko-fi",
+                        KOFI_URL,
+                    ));
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    // Bitcoin donation
+                    ui.label(egui::RichText::new("₿  Bitcoin").strong());
+                    ui.add_space(4.0);
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(BITCOIN_ADDRESS)
+                                .monospace()
+                                .size(11.0),
+                        )
+                        .selectable(true),
+                    );
+                    ui.add_space(4.0);
+                    if ui.small_button("Copy address").clicked() {
+                        ctx.copy_text(BITCOIN_ADDRESS.to_owned());
+                    }
+
+                    ui.add_space(12.0);
+                });
+            });
+        });
+    }
 }
 
 // --------------------------------------------------------------------------

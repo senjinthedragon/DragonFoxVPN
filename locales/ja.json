@@ -8,6 +8,7 @@
   "tray.autoreconnect": "\u30b5\u30fc\u30d0\u30fc\u5fa9\u5e30\u6642\u306b\u81ea\u52d5\u518d\u63a5\u7d9a",
   "tray.run_on_startup": "\u30b9\u30bf\u30fc\u30c8\u30a2\u30c3\u30d7\u306b\u767b\u9332",
   "tray.settings": "\u8a2d\u5b9a...",
+  "tray.about": "このアプリについて...",
   "tray.exit": "\u7d42\u4e86",
   "tray.connected_location": "\u63a5\u7d9a\u4e2d - {location}",
   "tray.dropped": "\u63a5\u7d9a\u304c\u5207\u65ad\u3055\u308c\u307e\u3057\u305f",

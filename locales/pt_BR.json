@@ -8,6 +8,7 @@
   "tray.autoreconnect": "Reconectar se o servidor voltar",
   "tray.run_on_startup": "Executar na inicializa\u00e7\u00e3o",
   "tray.settings": "Configura\u00e7\u00f5es...",
+  "tray.about": "Sobre...",
   "tray.exit": "Sair",
   "tray.connected_location": "Conectado - {location}",
   "tray.dropped": "Conex\u00e3o perdida",
