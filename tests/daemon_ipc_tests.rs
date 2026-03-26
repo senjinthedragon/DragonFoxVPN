@@ -51,9 +51,27 @@ fn test_status_file_roundtrip() {
 
 #[test]
 fn test_daemon_command_serialization_roundtrip() {
-    let json = serde_json::to_string(&DaemonCommand::Reconnect).expect("serialize command");
-    let parsed: DaemonCommand = serde_json::from_str(&json).expect("deserialize command");
-    assert!(matches!(parsed, DaemonCommand::Reconnect));
+    for cmd in [DaemonCommand::Reconnect, DaemonCommand::ReloadConfig, DaemonCommand::Restart] {
+        let json = serde_json::to_string(&cmd).expect("serialize command");
+        let parsed: DaemonCommand = serde_json::from_str(&json).expect("deserialize command");
+        let matches = match (&cmd, &parsed) {
+            (DaemonCommand::Reconnect, DaemonCommand::Reconnect) => true,
+            (DaemonCommand::ReloadConfig, DaemonCommand::ReloadConfig) => true,
+            (DaemonCommand::Restart, DaemonCommand::Restart) => true,
+            _ => false,
+        };
+        assert!(matches, "roundtrip failed for {:?}", cmd);
+    }
+}
+
+#[test]
+fn test_restart_command_file_roundtrip() {
+    let _guard = FILE_LOCK.lock().unwrap();
+    dragonfox_vpn::daemon_ipc::clear_daemon_command();
+    dragonfox_vpn::daemon_ipc::write_daemon_command(DaemonCommand::Restart);
+    let cmd = dragonfox_vpn::daemon_ipc::take_daemon_command();
+    assert!(matches!(cmd, Some(DaemonCommand::Restart)));
+    dragonfox_vpn::daemon_ipc::clear_daemon_command();
 }
 
 #[test]
