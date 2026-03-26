@@ -12,7 +12,7 @@ name = "DragonFoxVPN"
 path = "src/main.rs"
 
 [dependencies]
-eframe = { version = "0.28", default-features = false, features = ["default_fonts", "glow", "wgpu", "wayland", "x11"] }
+eframe = { version = "0.28", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
 egui = "0.28"
 tray-icon = "0.21"
 ureq = { version = "2", features = ["native-tls"] }
@@ -21,7 +21,6 @@ scraper = "0.19"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ctrlc = "3"
-notify-rust = "4"
 log = "0.4"
 env_logger = "0.11"
 directories = "5"
@@ -29,6 +28,7 @@ image = { version = "0.24", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.52"
+notify-rust = "4"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"

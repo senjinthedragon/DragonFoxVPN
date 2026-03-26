@@ -14,13 +14,18 @@ pub fn notify(summary: &str, body: &str) {
     let summary = summary.to_string();
     let body = body.to_string();
     std::thread::spawn(move || {
-        let mut n = notify_rust::Notification::new();
-        n.appname("DragonFoxVPN")
-            .summary(&summary)
-            .body(&body);
-        // On Linux use the standard network-vpn icon from the system theme.
+        #[cfg(target_os = "windows")]
+        {
+            let mut n = notify_rust::Notification::new();
+            n.appname("DragonFoxVPN").summary(&summary).body(&body);
+            n.show().ok();
+        }
         #[cfg(not(target_os = "windows"))]
-        n.icon("network-vpn");
-        n.show().ok();
+        {
+            std::process::Command::new("notify-send")
+                .args(["-a", "DragonFoxVPN", "-i", "network-vpn", &summary, &body])
+                .status()
+                .ok();
+        }
     });
 }

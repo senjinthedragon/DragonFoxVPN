@@ -111,49 +111,24 @@ fn pid_is_running(_pid: u32) -> bool {
 // Renderer helper
 // --------------------------------------------------------------------------
 
-/// Run an eframe window, falling back from glow (OpenGL) to wgpu if the
-/// system does not support OpenGL 2.0+. The fallback is silent on success
-/// and only logs if both renderers fail.
+/// Run an eframe window using the glow (OpenGL) renderer.
 fn run_native_with_fallback(
     title: &str,
-    options: eframe::NativeOptions,
+    mut options: eframe::NativeOptions,
     make_app: impl Fn() -> Box<dyn eframe::App> + 'static,
 ) {
     let visuals = platform_visuals();
-    let make_app = std::sync::Arc::new(std::sync::Mutex::new(Some(make_app)));
-
-    // Explicitly try glow (OpenGL) first - lighter weight and more widely
-    // supported. If it fails, fall back to wgpu (DirectX/Vulkan on Windows).
-    let mut glow_options = options.clone();
-    glow_options.renderer = eframe::Renderer::Glow;
-
-    let make_app_clone = make_app.clone();
-    let visuals_clone = visuals.clone();
-    let result = eframe::run_native(
+    options.renderer = eframe::Renderer::Glow;
+    if let Err(e) = eframe::run_native(
         title,
-        glow_options,
+        options,
         Box::new(move |cc| {
-            cc.egui_ctx.set_visuals(visuals_clone);
+            cc.egui_ctx.set_visuals(visuals);
             crate::locale::apply_cjk_font_if_needed(&cc.egui_ctx);
-            Ok(make_app_clone.lock().unwrap().take().unwrap()())
+            Ok(make_app())
         }),
-    );
-
-    if let Err(e) = result {
-        log::warn!("glow renderer unavailable ({e}), retrying with wgpu");
-        let mut wgpu_options = options;
-        wgpu_options.renderer = eframe::Renderer::Wgpu;
-        if let Err(e2) = eframe::run_native(
-            title,
-            wgpu_options,
-            Box::new(move |cc| {
-                cc.egui_ctx.set_visuals(visuals);
-                crate::locale::apply_cjk_font_if_needed(&cc.egui_ctx);
-                Ok(make_app.lock().unwrap().take().unwrap()())
-            }),
-        ) {
-            log::error!("wgpu renderer also failed: {e2}");
-        }
+    ) {
+        log::error!("renderer failed: {e}");
     }
 }
 
