@@ -726,6 +726,17 @@ fn handle_hc_event(
     match ev {
         HcEvent::Healthy => {}
         HcEvent::LocationFetched(label) => {
+            // Notify if the location changed externally while connected.
+            if *vpn_state == VpnState::Connected
+                && !status.location.is_empty()
+                && status.location != "Unknown"
+                && status.location != label
+            {
+                dragonfox_vpn::notifications::notify(
+                    "VPN Location Changed",
+                    &format!("Location changed to {label}."),
+                );
+            }
             status.location = label.clone();
             save_daemon_status(status);
             if *vpn_state == VpnState::Connected {
@@ -756,12 +767,27 @@ fn handle_hc_event(
                 } else {
                     "VPN route lost unexpectedly."
                 };
+                if kill_switched {
+                    dragonfox_vpn::notifications::notify(
+                        "Kill Switch Activated",
+                        "VPN dropped - internet blocked to prevent traffic leaks.",
+                    );
+                } else {
+                    dragonfox_vpn::notifications::notify(
+                        "VPN Connection Dropped",
+                        "The VPN route was lost unexpectedly.",
+                    );
+                }
                 set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg.to_string()));
                 error!("{msg}");
             }
         }
         HcEvent::Unreachable => {
             if *vpn_state != VpnState::ServerUnreachable {
+                dragonfox_vpn::notifications::notify(
+                    "VPN Server Unreachable",
+                    "Cannot reach the VPN gateway.",
+                );
                 set_vpn_unreachable(tray, items, vpn_state, connected_since, status);
                 warn!("VPN server unreachable.");
             }

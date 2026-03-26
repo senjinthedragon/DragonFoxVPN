@@ -8,6 +8,7 @@
 // in tests/ can import them. The binary (main.rs) calls into this crate.
 
 pub mod api;
+pub mod notifications;
 pub mod app;
 pub mod autostart;
 pub mod daemon_ipc;
