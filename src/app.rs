@@ -333,7 +333,8 @@ struct SettingsWindow {
     // Behavior toggles (moved from tray menu)
     auto_connect: bool,
     auto_reconnect: bool,
-    run_on_startup: bool, // Windows only
+    #[cfg(target_os = "windows")]
+    run_on_startup: bool,
     // Language selection
     language: String, // locale code, e.g. "en", "de"; empty = system auto
     // Auto-resolve VPN server IP from the switcher URL.
@@ -359,6 +360,7 @@ impl SettingsWindow {
             saved: false,
             auto_connect: cfg.auto_connect,
             auto_reconnect: cfg.auto_reconnect,
+            #[cfg(target_os = "windows")]
             run_on_startup: crate::autostart::AutoStartManager::is_enabled(),
             language: cfg.language.clone().unwrap_or_else(|| {
                 crate::locale::active_language().to_string()
