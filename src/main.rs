@@ -116,6 +116,14 @@ fn main() {
     // GTK is NOT initialised here - each subprocess has a clean eframe event
     // loop with no competing Wayland connections, which is why close works.
     let args: Vec<String> = std::env::args().collect();
+
+    // On restart the old daemon spawns us with --restart and exits immediately.
+    // Sleep briefly so the old process fully exits and releases the named mutex
+    // before we run the single-instance check.
+    if args.iter().any(|a| a == "--restart") {
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     if args.len() >= 3 && args[1] == "--ui" {
         match args[2].as_str() {
             "settings" => dragonfox_vpn::app::run_settings_window(),
@@ -376,7 +384,7 @@ fn run_tray_daemon() {
                 DaemonCommand::Restart => {
                     info!("Restart requested by settings subprocess.");
                     if let Ok(exe) = std::env::current_exe() {
-                        let _ = std::process::Command::new(exe).spawn();
+                        let _ = std::process::Command::new(exe).arg("--restart").spawn();
                     }
                     std::process::exit(0);
                 }
