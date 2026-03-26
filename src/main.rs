@@ -288,7 +288,7 @@ fn run_tray_daemon() {
             } else {
                 // Restore each item to its correct state.
                 items.dashboard.set_enabled(true);
-                items.settings.set_enabled(true);
+                items.settings.set_enabled(!matches!(vpn_state, VpnState::Connected | VpnState::Enabling));
                 items.about.set_enabled(true);
                 items.exit.set_enabled(true);
                 let setup_done = config.setup_complete;
@@ -375,9 +375,6 @@ fn run_tray_daemon() {
                 }
                 DaemonCommand::Restart => {
                     info!("Restart requested by settings subprocess.");
-                    if vpn_state == VpnState::Connected {
-                        do_disable_vpn(&adapter, &config);
-                    }
                     if let Ok(exe) = std::env::current_exe() {
                         let _ = std::process::Command::new(exe).spawn();
                     }
@@ -457,6 +454,7 @@ fn set_vpn_enabling(
     *vpn_state = VpnState::Enabling;
     items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(false);
+    items.settings.set_enabled(false);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Enabling".to_string();
     status.message = Some(t("status.connecting"));
@@ -476,6 +474,7 @@ fn set_vpn_connected(
     *connected_since = Some(Instant::now());
     items.toggle.set_text(&t("tray.disable_vpn"));
     items.toggle.set_enabled(true);
+    items.settings.set_enabled(false);
     status.state = "Connected".to_string();
     status.connected_since_unix = Some(current_unix_ts());
     // Prefer saved config location; fall back to whatever was fetched at
@@ -504,6 +503,7 @@ fn set_vpn_disabled(
     *connected_since = None;
     items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
+    items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
@@ -520,6 +520,7 @@ fn set_vpn_failed(
     *vpn_state = VpnState::Disabled;
     items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
+    items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
@@ -539,6 +540,7 @@ fn set_vpn_dropped(
     *connected_since = None;
     items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
+    items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Dropped".to_string();
     status.connected_since_unix = None;
@@ -557,6 +559,7 @@ fn set_vpn_unreachable(
     *connected_since = None;
     items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
+    items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "ServerUnreachable".to_string();
     status.connected_since_unix = None;
