@@ -188,18 +188,6 @@ Pre-built binaries for Windows and Linux are available on the [GitHub Releases p
 
 If you'd rather build from source, see [Building the Executables Yourself](#building-the-executables-yourself) at the bottom of this file.
 
-### Linux: required library
-
-The pre-built binary requires `libxdo`, install it before running:
-
-```bash
-# Arch-based
-sudo pacman -S xdotool
-
-# Debian/Ubuntu (note: the pre-built binary is compiled on Arch and links against libxdo.so.4 — Ubuntu ships libxdo.so.3 and may not be compatible)
-sudo apt install libxdo3
-```
-
 ### Linux: passwordless sudo for network commands
 
 The tray app uses `ip`, `resolvectl`, and `sysctl` to manage routing. Rather than running the
