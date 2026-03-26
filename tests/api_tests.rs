@@ -6,7 +6,7 @@
 
 use dragonfox_vpn::api::{
     country_to_iso, ensure_trailing_slash, extract_php_error, parse_locations,
-    resolve_redirect, strip_continent_emojis, strip_country_emojis, urlencoded,
+    resolve_redirect, strip_continent_emojis, strip_country_emojis,
 };
 
 // ---------------------------------------------------------------------------
@@ -180,53 +180,6 @@ fn test_parse_flag_emoji_stripped_from_label() {
     );
     let (locs, _) = parse_locations(&html);
     assert_eq!(locs[0].label, "UK - London");
-}
-
-// ---------------------------------------------------------------------------
-// urlencoded
-// ---------------------------------------------------------------------------
-
-#[test]
-fn test_urlencoded_alphanumeric_passthrough() {
-    assert_eq!(urlencoded("abc123"), "abc123");
-    assert_eq!(urlencoded("ABCxyz"), "ABCxyz");
-}
-
-#[test]
-fn test_urlencoded_unreserved_chars_passthrough() {
-    assert_eq!(urlencoded("-_.~"), "-_.~");
-}
-
-#[test]
-fn test_urlencoded_space_becomes_plus() {
-    assert_eq!(urlencoded("hello world"), "hello+world");
-}
-
-#[test]
-fn test_urlencoded_slash_is_encoded() {
-    assert_eq!(urlencoded("a/b"), "a%2Fb");
-}
-
-#[test]
-fn test_urlencoded_ampersand_is_encoded() {
-    assert_eq!(urlencoded("a&b"), "a%26b");
-}
-
-#[test]
-fn test_urlencoded_equals_is_encoded() {
-    assert_eq!(urlencoded("a=b"), "a%3Db");
-}
-
-#[test]
-fn test_urlencoded_empty_string() {
-    assert_eq!(urlencoded(""), "");
-}
-
-#[test]
-fn test_urlencoded_typical_location_value() {
-    // Location values in practice are slugs like "uk-london" - should pass through unchanged
-    assert_eq!(urlencoded("uk-london"), "uk-london");
-    assert_eq!(urlencoded("us-new-york"), "us-new-york");
 }
 
 // ---------------------------------------------------------------------------

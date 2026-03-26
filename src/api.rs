@@ -177,20 +177,6 @@ pub fn extract_php_error(html: &str) -> Option<String> {
     if trimmed.is_empty() { None } else { Some(trimmed) }
 }
 
-pub fn urlencoded(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-            ' ' => "+".to_string(),
-            c => {
-                let mut buf = [0u8; 4];
-                let bytes = c.encode_utf8(&mut buf).as_bytes();
-                bytes.iter().map(|b| format!("%{:02X}", b)).collect()
-            }
-        })
-        .collect()
-}
-
 pub fn parse_locations(html: &str) -> (Vec<Location>, Option<String>) {
     let document = Html::parse_document(html);
 

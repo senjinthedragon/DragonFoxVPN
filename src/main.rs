@@ -67,7 +67,9 @@ fn clear_vpn_active() {
 /// Restore normal routing if the VPN is active. Safe to call from a signal
 /// handler or panic hook - reads from the static and issues OS commands only.
 fn emergency_vpn_restore() {
-    if let Ok(g) = vpn_active_lock().lock() {
+    // Use try_lock to avoid deadlocking if the panic occurred while the mutex
+    // was already held (e.g. inside set_vpn_active / clear_vpn_active).
+    if let Ok(g) = vpn_active_lock().try_lock() {
         if let Some((adapter, vpn_gateway)) = g.as_ref() {
             dragonfox_vpn::vpn_runtime::disable_vpn(adapter, vpn_gateway);
         }
@@ -81,19 +83,6 @@ fn emergency_vpn_restore() {
 fn main() {
     let mut logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
     logger.format_timestamp_secs();
-    // On Windows the console is suppressed, so also write logs to a file
-    // next to the executable so they can be inspected for debugging.
-    #[cfg(target_os = "windows")]
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
-            let log_path = dir.join("dragonfoxvpn.log");
-            if let Ok(file) = std::fs::OpenOptions::new()
-                .create(true).append(true).open(&log_path)
-            {
-                logger.target(env_logger::Target::Pipe(Box::new(file)));
-            }
-        }
-    }
     logger.init();
 
     // Initialise localisation before any user-visible strings are produced.

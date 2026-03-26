@@ -87,7 +87,23 @@ pub struct SystemHandler;
 
 impl SystemHandler {
     fn is_safe_adapter(adapter: &str) -> bool {
-        regex_lite(r"^[a-zA-Z0-9._:-]+$").is_match(adapter)
+        if std::env::consts::OS == "windows" {
+            // Windows adapter names can contain spaces and parentheses.
+            // All Windows commands already wrap the adapter in double-quotes,
+            // so we only need to block chars that break out of those quotes.
+            !adapter.is_empty()
+                && adapter.chars().all(|c| {
+                    c.is_ascii_alphanumeric()
+                        || c == ' '
+                        || c == '.'
+                        || c == '_'
+                        || c == '-'
+                        || c == '('
+                        || c == ')'
+                })
+        } else {
+            regex_lite(r"^[a-zA-Z0-9._:-]+$").is_match(adapter)
+        }
     }
 
     fn is_safe_host(host: &str) -> bool {
@@ -96,17 +112,20 @@ impl SystemHandler {
 
     /// Detect the active network adapter name.
     pub fn get_active_adapter() -> String {
-        let safe_re = regex_lite(r"^[a-zA-Z0-9._:-]+$");
-
         if std::env::consts::OS == "windows" {
+            // netsh output format: Idx  Met  MTU  State  Name
+            // Name is column 5 onwards and can be multi-word ("Local Area Connection").
+            // We join parts[4..] to reconstruct the full name.
             let (stdout, _, code) = run_command("netsh interface ipv4 show interfaces");
             if code == 0 {
                 for line in stdout.lines() {
                     let lower = line.to_lowercase();
                     if lower.contains("connected") && !lower.contains("loopback") {
-                        if let Some(candidate) = line.split_whitespace().last() {
-                            if safe_re.is_match(candidate) {
-                                return candidate.to_string();
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 5 {
+                            let name = parts[4..].join(" ");
+                            if Self::is_safe_adapter(&name) {
+                                return name;
                             }
                         }
                     }
@@ -114,6 +133,7 @@ impl SystemHandler {
             }
             "Ethernet".to_string()
         } else {
+            let safe_re = regex_lite(r"^[a-zA-Z0-9._:-]+$");
             let (stdout, _, code) = run_command("ip route show default");
             if code == 0 && !stdout.is_empty() {
                 // Look for "dev <name>"
@@ -331,7 +351,7 @@ impl SimpleRegex {
                     c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == ':' || c == '-'
                 })
         } else {
-            true
+            false
         }
     }
 }
