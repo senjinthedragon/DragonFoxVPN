@@ -229,7 +229,7 @@ Access **Settings...** from the tray menu at any time to update network configur
 
 - **Network**: VPN Switcher URL, VPN Server IP, Router IP, and the Test Connection button.
 - **Behavior**: Auto-Connect on start, Auto-Reconnect if server returns, and Run on Startup (Windows only).
-- **Language**: Select from 10 supported languages. Takes effect after restart.
+- **Language**: Select from 10 supported languages. The app restarts automatically when you save.
 
 ## Running
 
