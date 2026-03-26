@@ -39,7 +39,7 @@ fn log_cmd((stdout, stderr, code): (String, String, i32)) {
 }
 
 /// Set DNS via resolvectl. Downgrades the failure to info-level when
-/// systemd-resolved is simply not running (e.g. Garuda/Arch), since
+/// systemd-resolved is simply not running (e.g. on Arch-based distros), since
 /// DNS will still flow correctly through the VPN tunnel in that case.
 fn set_dns_resolvectl(adapter: &str, vpn_dns: &str) {
     let (_, stderr, code) = run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}"));
