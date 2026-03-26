@@ -107,6 +107,46 @@ fn pid_is_running(_pid: u32) -> bool {
 }
 
 // --------------------------------------------------------------------------
+// Renderer helper
+// --------------------------------------------------------------------------
+
+/// Run an eframe window, falling back from glow (OpenGL) to wgpu if the
+/// system does not support OpenGL 2.0+. The fallback is silent on success
+/// and only logs if both renderers fail.
+fn run_native_with_fallback(
+    title: &str,
+    options: eframe::NativeOptions,
+    make_app: impl Fn() -> Box<dyn eframe::App> + 'static,
+) {
+    let make_app = std::sync::Arc::new(std::sync::Mutex::new(Some(make_app)));
+
+    let make_app_clone = make_app.clone();
+    let result = eframe::run_native(
+        title,
+        options.clone(),
+        Box::new(move |_cc| Ok(make_app_clone.lock().unwrap().take().unwrap()())),
+    );
+
+    if let Err(e) = result {
+        let msg = e.to_string().to_lowercase();
+        if msg.contains("opengl") || msg.contains("egui_glow") || msg.contains("glow") {
+            log::warn!("glow renderer unavailable ({e}), retrying with wgpu");
+            let mut wgpu_options = options;
+            wgpu_options.renderer = eframe::Renderer::Wgpu;
+            if let Err(e2) = eframe::run_native(
+                title,
+                wgpu_options,
+                Box::new(move |_cc| Ok(make_app.lock().unwrap().take().unwrap()())),
+            ) {
+                log::error!("wgpu renderer also failed: {e2}");
+            }
+        } else {
+            log::error!("Failed to open window: {e}");
+        }
+    }
+}
+
+// --------------------------------------------------------------------------
 // Public entry points called from main.rs --ui dispatch
 // --------------------------------------------------------------------------
 
@@ -132,13 +172,11 @@ pub fn run_settings_window() {
         ..Default::default()
     };
 
-    if let Err(e) = eframe::run_native(
+    run_native_with_fallback(
         "DragonFoxVPN Settings",
         options,
-        Box::new(move |_cc| Ok(Box::new(SettingsWindow::new(first_run)))),
-    ) {
-        log::error!("Failed to open settings window: {e}");
-    }
+        move || Box::new(SettingsWindow::new(first_run)),
+    );
 }
 
 /// Status dashboard dialog.
@@ -156,13 +194,11 @@ pub fn run_status_window() {
         ..Default::default()
     };
 
-    if let Err(e) = eframe::run_native(
+    run_native_with_fallback(
         "DragonFoxVPN Status",
         options,
-        Box::new(|_cc| Ok(Box::new(StatusWindow::new()))),
-    ) {
-        log::error!("Failed to open status window: {e}");
-    }
+        || Box::new(StatusWindow::new()),
+    );
 }
 
 /// Location picker dialog.
@@ -180,13 +216,11 @@ pub fn run_location_window() {
         ..Default::default()
     };
 
-    if let Err(e) = eframe::run_native(
+    run_native_with_fallback(
         "DragonFoxVPN Location",
         options,
-        Box::new(|_cc| Ok(Box::new(LocationWindow::new()))),
-    ) {
-        log::error!("Failed to open location window: {e}");
-    }
+        || Box::new(LocationWindow::new()),
+    );
 }
 
 // --------------------------------------------------------------------------
