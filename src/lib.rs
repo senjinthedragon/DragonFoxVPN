@@ -33,19 +33,32 @@ pub fn single_instance_check() -> bool {
 
 #[cfg(target_os = "windows")]
 fn single_instance_check_windows() -> bool {
-    let output = std::process::Command::new("tasklist")
-        .args(["/FI", "IMAGENAME eq DragonFoxVPN.exe", "/NH", "/FO", "CSV"])
-        .output();
-    match output {
-        Ok(o) => {
-            let text = String::from_utf8_lossy(&o.stdout);
-            let count = text
-                .lines()
-                .filter(|l| l.contains("DragonFoxVPN.exe"))
-                .count();
-            count <= 1
+    // Use a named mutex — the correct Windows single-instance pattern.
+    // Only the daemon creates/holds this mutex; --ui subprocesses never call
+    // single_instance_check, so they don't interfere. tasklist-based counting
+    // incorrectly includes subprocesses and breaks on restart.
+    use std::os::windows::ffi::OsStrExt;
+    extern "system" {
+        fn CreateMutexW(
+            lp_mutex_attributes: *mut std::ffi::c_void,
+            b_initial_owner: i32,
+            lp_name: *const u16,
+        ) -> *mut std::ffi::c_void;
+        fn GetLastError() -> u32;
+    }
+    const ERROR_ALREADY_EXISTS: u32 = 183;
+    let name: Vec<u16> = std::ffi::OsStr::new("Local\\DragonFoxVPN_Daemon")
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    unsafe {
+        let handle = CreateMutexW(std::ptr::null_mut(), 0, name.as_ptr());
+        if handle.is_null() {
+            return true; // couldn't create mutex, allow startup
         }
-        Err(_) => true,
+        // Intentionally leak the handle — it keeps the mutex alive until the
+        // process exits, at which point the OS releases it automatically.
+        GetLastError() != ERROR_ALREADY_EXISTS
     }
 }
 
