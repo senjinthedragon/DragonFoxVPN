@@ -48,6 +48,14 @@ if [[ -z "$TARGET" ]]; then
     exit 1
 fi
 
+# Defense-in-depth: only allow expected location token characters.
+# This blocks path traversal and shell metacharacters even if caller-side
+# escaping is bypassed.
+if [[ ! "$TARGET" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "Invalid location name: only letters, numbers, dot, underscore, and dash are allowed." >&2
+    exit 1
+fi
+
 CONF_FILE="$EXPRESS_DIR/$TARGET.ovpn"
 
 if [[ ! -f "$CONF_FILE" ]]; then
