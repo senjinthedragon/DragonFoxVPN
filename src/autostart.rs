@@ -55,7 +55,7 @@ impl AutoStartManager {
     #[cfg(target_os = "windows")]
     pub fn set_autostart(enable: bool) {
         use log::error;
-        use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE, REG_SZ};
+        use winreg::enums::{HKEY_CURRENT_USER, KEY_SET_VALUE};
         use winreg::RegKey;
 
         let hkcu = RegKey::predef(HKEY_CURRENT_USER);
