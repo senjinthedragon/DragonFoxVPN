@@ -163,20 +163,37 @@ pub fn t_fmt(key: &str, args: &[(&str, &str)]) -> String {
 /// attempt to load a system CJK font and register it with egui so the
 /// characters render correctly. On systems without such a font this is a no-op.
 pub fn apply_cjk_font_if_needed(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    // Always embed the bundled 19-glyph subset as a fallback so the language
+    // picker renders correctly on any system, regardless of installed fonts.
+    fonts.font_data.insert(
+        "lang_glyphs".to_owned(),
+        egui::FontData::from_static(include_bytes!("../assets/lang_glyphs.ttf")),
+    );
+    fonts
+        .families
+        .entry(egui::FontFamily::Proportional)
+        .or_default()
+        .push("lang_glyphs".to_owned());
+
+    // If a full system CJK font exists, add it before the subset so users
+    // running in a CJK language get complete glyph coverage throughout the UI.
     if let Some(path) = find_cjk_font(detected_language()) {
         if let Ok(bytes) = std::fs::read(&path) {
-            let mut fonts = egui::FontDefinitions::default();
             fonts
                 .font_data
                 .insert("cjk".to_owned(), egui::FontData::from_owned(bytes));
-            fonts
+            let prop = fonts
                 .families
                 .entry(egui::FontFamily::Proportional)
-                .or_default()
-                .push("cjk".to_owned());
-            ctx.set_fonts(fonts);
+                .or_default();
+            let pos = prop.len() - 1;
+            prop.insert(pos, "cjk".to_owned());
         }
     }
+
+    ctx.set_fonts(fonts);
 }
 
 fn find_cjk_font(lang: &str) -> Option<std::path::PathBuf> {
