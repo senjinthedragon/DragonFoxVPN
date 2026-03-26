@@ -1,3 +1,9 @@
+// tests/vpn_runtime_tests.rs - DragonFoxVPN: VPN enable/disable and health check tests
+// Copyright (c) 2026 Senjin the Dragon.
+// https://github.com/senjinthedragon/DragonFoxVPN
+// Licensed under the MIT License.
+// See LICENSE for full license information.
+
 use dragonfox_vpn::vpn_runtime;
 
 #[test]

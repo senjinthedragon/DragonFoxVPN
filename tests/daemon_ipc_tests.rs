@@ -1,3 +1,9 @@
+// tests/daemon_ipc_tests.rs - DragonFoxVPN: DaemonCommand and DaemonStatus IPC tests
+// Copyright (c) 2026 Senjin the Dragon.
+// https://github.com/senjinthedragon/DragonFoxVPN
+// Licensed under the MIT License.
+// See LICENSE for full license information.
+
 use dragonfox_vpn::daemon_ipc::{DaemonCommand, DaemonStatus};
 
 // Tests that write to the command/status files must not run concurrently
