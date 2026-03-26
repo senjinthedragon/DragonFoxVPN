@@ -60,14 +60,7 @@ fn test_daemon_command_serialization_roundtrip() {
     for cmd in [DaemonCommand::Reconnect, DaemonCommand::ReloadConfig, DaemonCommand::Restart, DaemonCommand::Quit] {
         let json = serde_json::to_string(&cmd).expect("serialize command");
         let parsed: DaemonCommand = serde_json::from_str(&json).expect("deserialize command");
-        let matches = match (&cmd, &parsed) {
-            (DaemonCommand::Reconnect, DaemonCommand::Reconnect) => true,
-            (DaemonCommand::ReloadConfig, DaemonCommand::ReloadConfig) => true,
-            (DaemonCommand::Restart, DaemonCommand::Restart) => true,
-            (DaemonCommand::Quit, DaemonCommand::Quit) => true,
-            _ => false,
-        };
-        assert!(matches, "roundtrip failed for {:?}", cmd);
+        assert_eq!(cmd, parsed, "roundtrip failed for {:?}", cmd);
     }
 }
 

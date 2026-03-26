@@ -38,7 +38,7 @@ pub struct DaemonStatus {
 // Daemon commands  (UI → daemon)
 // --------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum DaemonCommand {
     /// UI saved new settings - daemon should reload AppConfig.
     ReloadConfig,

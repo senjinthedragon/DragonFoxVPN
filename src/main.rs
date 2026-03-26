@@ -457,7 +457,7 @@ fn set_vpn_enabling(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Enabling;
-    items.toggle.set_text(&t("tray.enable_vpn"));
+    items.toggle.set_text(t("tray.enable_vpn"));
     items.toggle.set_enabled(false);
     items.settings.set_enabled(false);
     update_tray_icon(tray, items, vpn_state, None);
@@ -477,7 +477,7 @@ fn set_vpn_connected(
 ) {
     *vpn_state = VpnState::Connected;
     *connected_since = Some(Instant::now());
-    items.toggle.set_text(&t("tray.disable_vpn"));
+    items.toggle.set_text(t("tray.disable_vpn"));
     items.toggle.set_enabled(true);
     items.settings.set_enabled(false);
     status.state = "Connected".to_string();
@@ -507,7 +507,7 @@ fn set_vpn_disabled(
 ) {
     *vpn_state = VpnState::Disabled;
     *connected_since = None;
-    items.toggle.set_text(&t("tray.enable_vpn"));
+    items.toggle.set_text(t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
@@ -525,7 +525,7 @@ fn set_vpn_failed(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Disabled;
-    items.toggle.set_text(&t("tray.enable_vpn"));
+    items.toggle.set_text(t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
@@ -545,7 +545,7 @@ fn set_vpn_dropped(
 ) {
     *vpn_state = VpnState::Dropped;
     *connected_since = None;
-    items.toggle.set_text(&t("tray.enable_vpn"));
+    items.toggle.set_text(t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
@@ -564,7 +564,7 @@ fn set_vpn_unreachable(
 ) {
     *vpn_state = VpnState::ServerUnreachable;
     *connected_since = None;
-    items.toggle.set_text(&t("tray.enable_vpn"));
+    items.toggle.set_text(t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     items.settings.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
@@ -743,6 +743,7 @@ fn health_check_loop(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_hc_event(
     ev: HcEvent,
     tray: &TrayIcon,
@@ -781,7 +782,7 @@ fn handle_hc_event(
                     *connected_since = Some(Instant::now());
                     status.connected_since_unix = Some(current_unix_ts());
                 }
-                items.toggle.set_text(&t("tray.disable_vpn"));
+                items.toggle.set_text(t("tray.disable_vpn"));
                 items.toggle.set_enabled(true);
                 update_tray_icon(tray, items, vpn_state, Some(&status.location));
                 status.state = "Connected".to_string();
@@ -899,21 +900,21 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     // label at the top of the menu is the only way to surface state there.
     // On Windows the tooltip works, so the menu label is redundant.
     let status_label = if cfg!(not(target_os = "windows")) {
-        Some(MenuItem::new(&t("tray.disconnected"), false, None))
+        Some(MenuItem::new(t("tray.disconnected"), false, None))
     } else {
         None
     };
     let sep0 = PredefinedMenuItem::separator();
-    let dashboard = MenuItem::new(&t("tray.dashboard"), true, None);
+    let dashboard = MenuItem::new(t("tray.dashboard"), true, None);
     let sep1 = PredefinedMenuItem::separator();
-    let toggle = MenuItem::new(&t("tray.enable_vpn"), setup_complete, None);
+    let toggle = MenuItem::new(t("tray.enable_vpn"), setup_complete, None);
     let sep2 = PredefinedMenuItem::separator();
-    let location = MenuItem::new(&t("tray.change_location"), setup_complete, None);
+    let location = MenuItem::new(t("tray.change_location"), setup_complete, None);
     let sep3 = PredefinedMenuItem::separator();
-    let settings = MenuItem::new(&t("tray.settings"), true, None);
-    let about = MenuItem::new(&t("tray.about"), true, None);
+    let settings = MenuItem::new(t("tray.settings"), true, None);
+    let about = MenuItem::new(t("tray.about"), true, None);
     let sep4 = PredefinedMenuItem::separator();
-    let exit = MenuItem::new(&t("tray.exit"), true, None);
+    let exit = MenuItem::new(t("tray.exit"), true, None);
 
     if let Some(ref sl) = status_label {
         let _ = menu.append(sl);
@@ -939,7 +940,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(initial_icon)
-        .with_tooltip(&format!("DragonFoxVPN: {}", t("tray.disconnected")))
+        .with_tooltip(format!("DragonFoxVPN: {}", t("tray.disconnected")))
         .build()
         .expect("Failed to create tray icon");
 

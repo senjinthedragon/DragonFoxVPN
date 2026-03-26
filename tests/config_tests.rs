@@ -52,15 +52,17 @@ fn test_serde_roundtrip_default() {
 
 #[test]
 fn test_serde_roundtrip_populated() {
-    let mut cfg = AppConfig::default();
-    cfg.favorites = vec!["UK - London".to_string(), "Germany - Frankfurt".to_string()];
-    cfg.auto_connect = true;
-    cfg.last_location = Some("UK - London".to_string());
-    cfg.vpn_gateway = Some("10.0.0.20".to_string());
-    cfg.isp_gateway = Some("10.0.0.1".to_string());
-    cfg.dns_server = Some("10.0.0.20".to_string());
-    cfg.switcher_url = Some("http://10.0.0.20".to_string());
-    cfg.setup_complete = true;
+    let cfg = AppConfig {
+        favorites: vec!["UK - London".to_string(), "Germany - Frankfurt".to_string()],
+        auto_connect: true,
+        last_location: Some("UK - London".to_string()),
+        vpn_gateway: Some("10.0.0.20".to_string()),
+        isp_gateway: Some("10.0.0.1".to_string()),
+        dns_server: Some("10.0.0.20".to_string()),
+        switcher_url: Some("http://10.0.0.20".to_string()),
+        setup_complete: true,
+        ..Default::default()
+    };
 
     let json = serde_json::to_string_pretty(&cfg).expect("serialize");
     let restored: AppConfig = serde_json::from_str(&json).expect("deserialize");
@@ -142,12 +144,14 @@ fn test_toggle_favorite_removes_when_present() {
 
 #[test]
 fn test_favorites_preserves_order() {
-    let mut cfg = AppConfig::default();
-    cfg.favorites = vec![
-        "UK - London".to_string(),
-        "Germany - Frankfurt".to_string(),
-        "Japan - Tokyo".to_string(),
-    ];
+    let cfg = AppConfig {
+        favorites: vec![
+            "UK - London".to_string(),
+            "Germany - Frankfurt".to_string(),
+            "Japan - Tokyo".to_string(),
+        ],
+        ..Default::default()
+    };
     assert_eq!(cfg.favorites[0], "UK - London");
     assert_eq!(cfg.favorites[1], "Germany - Frankfurt");
     assert_eq!(cfg.favorites[2], "Japan - Tokyo");

@@ -50,6 +50,7 @@ pub fn get_flags_dir() -> PathBuf {
 
 /// Persistent user configuration - JSON-compatible with the Python version.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct AppConfig {
     #[serde(default)]
     pub favorites: Vec<String>,
@@ -74,22 +75,6 @@ pub struct AppConfig {
     pub language: Option<String>,
 }
 
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            favorites: Vec::new(),
-            auto_connect: false,
-            auto_reconnect: false,
-            last_location: None,
-            vpn_gateway: None,
-            isp_gateway: None,
-            dns_server: None,
-            switcher_url: None,
-            setup_complete: false,
-            language: None,
-        }
-    }
-}
 
 impl AppConfig {
     /// Load config from disk, returning defaults on any failure.
