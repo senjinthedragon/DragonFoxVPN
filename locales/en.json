@@ -50,7 +50,6 @@
   "settings.section_network": "Network",
   "settings.section_behavior": "Behavior",
   "settings.section_language": "Language",
-  "settings.restart_required": "Takes effect after restart",
 
   "test.url_ok": "Switcher URL: {count} locations found",
   "test.url_wrong_page": "Switcher URL: reached but no locations found - wrong page?",

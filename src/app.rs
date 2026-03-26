@@ -500,7 +500,6 @@ impl eframe::App for SettingsWindow {
                         ui.selectable_value(&mut self.language, code.to_string(), *name);
                     }
                 });
-            ui.colored_label(egui::Color32::GRAY, t("settings.restart_required"));
 
             // ── Test results (when available) ─────────────────────────
             if !self.test_results.is_empty() {
@@ -573,6 +572,7 @@ impl SettingsWindow {
         let isp_gw = self.isp_gateway.to_ip_string();
 
         let mut cfg = AppConfig::load();
+        let language_changed = cfg.language.as_deref() != Some(self.language.as_str());
         cfg.vpn_gateway = Some(vpn_gw.clone());
         cfg.isp_gateway = Some(isp_gw);
         cfg.dns_server = Some(vpn_gw); // DNS is always the VPN server IP
@@ -587,8 +587,13 @@ impl SettingsWindow {
         #[cfg(target_os = "windows")]
         crate::autostart::AutoStartManager::set_autostart(self.run_on_startup);
 
-        // Tell the tray daemon to reload its config.
-        write_daemon_command(DaemonCommand::ReloadConfig);
+        // Language change requires a full restart to re-initialise the locale.
+        // Other changes only need a config reload.
+        if language_changed {
+            write_daemon_command(DaemonCommand::Restart);
+        } else {
+            write_daemon_command(DaemonCommand::ReloadConfig);
+        }
 
         let adapter = SystemHandler::get_active_adapter();
         info!("Settings saved. Active adapter: {adapter}");

@@ -50,7 +50,6 @@
   "settings.section_network": "Rede",
   "settings.section_behavior": "Comportamento",
   "settings.section_language": "Idioma",
-  "settings.restart_required": "Aplica-se ap\u00f3s reiniciar",
 
   "test.url_ok": "URL do comutador: {count} localiza\u00e7\u00f5es encontradas",
   "test.url_wrong_page": "URL do comutador: acess\u00edvel, mas sem localiza\u00e7\u00f5es - p\u00e1gina errada?",

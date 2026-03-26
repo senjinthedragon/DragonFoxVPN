@@ -43,6 +43,9 @@ pub enum DaemonCommand {
     ReloadConfig,
     /// UI switched VPN location while connected - daemon should reconnect.
     Reconnect,
+    /// UI changed a setting that requires a full restart (e.g. language).
+    /// Daemon spawns a fresh instance of itself then exits.
+    Restart,
 }
 
 // --------------------------------------------------------------------------

@@ -373,6 +373,13 @@ fn run_tray_daemon() {
                     save_daemon_status(&daemon_status);
                     info!("Config reloaded from daemon command.");
                 }
+                DaemonCommand::Restart => {
+                    info!("Restart requested by settings subprocess.");
+                    if let Ok(exe) = std::env::current_exe() {
+                        let _ = std::process::Command::new(exe).spawn();
+                    }
+                    std::process::exit(0);
+                }
                 DaemonCommand::Reconnect => {
                     info!("Reconnect requested by UI subprocess.");
                     if vpn_state == VpnState::Connected {

@@ -50,7 +50,6 @@
   "settings.section_network": "Netzwerk",
   "settings.section_behavior": "Verhalten",
   "settings.section_language": "Sprache",
-  "settings.restart_required": "Wird nach Neustart wirksam",
 
   "test.url_ok": "Switcher-URL: {count} Standorte gefunden",
   "test.url_wrong_page": "Switcher-URL: erreichbar, aber keine Standorte \u2013 falsche Seite?",

@@ -50,7 +50,6 @@
   "settings.section_network": "Rete",
   "settings.section_behavior": "Comportamento",
   "settings.section_language": "Lingua",
-  "settings.restart_required": "Ha effetto dopo il riavvio",
 
   "test.url_ok": "URL commutatore: {count} posizioni trovate",
   "test.url_wrong_page": "URL commutatore: raggiungibile ma nessuna posizione trovata - pagina errata?",

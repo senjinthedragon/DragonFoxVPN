@@ -50,7 +50,6 @@
   "settings.section_network": "Red",
   "settings.section_behavior": "Comportamiento",
   "settings.section_language": "Idioma",
-  "settings.restart_required": "Se aplica despu\u00e9s de reiniciar",
 
   "test.url_ok": "URL conmutador: {count} ubicaciones encontradas",
   "test.url_wrong_page": "URL conmutador: accesible pero sin ubicaciones - \u00bfp\u00e1gina incorrecta?",
