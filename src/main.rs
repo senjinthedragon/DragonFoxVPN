@@ -186,7 +186,7 @@ fn run_tray_daemon() {
     // Track local VPN state for the daemon loop.
     let mut vpn_state = VpnState::Disabled;
     let mut connected_since: Option<Instant> = None;
-    update_tray_icon(&tray, &vpn_state, None);
+    update_tray_icon(&tray, &items, &vpn_state, None);
 
     // Auto-connect on startup if configured; otherwise ensure routing is in
     // the non-VPN state. This recovers from a previous crash (SIGSEGV, etc.)
@@ -362,7 +362,7 @@ fn run_tray_daemon() {
 
         // Poll tray icon events (double-click opens status).
         while let Ok(ev) = TrayIconEvent::receiver().try_recv() {
-            if ev.click_type == tray_icon::ClickType::Double {
+            if matches!(ev, TrayIconEvent::DoubleClick { .. }) {
                 spawn_ui("status");
             }
         }
@@ -410,7 +410,7 @@ fn set_vpn_enabling(
     *vpn_state = VpnState::Enabling;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(false);
-    update_tray_icon(tray, vpn_state, None);
+    update_tray_icon(tray, items, vpn_state, None);
     status.state = "Enabling".to_string();
     status.message = Some("Connecting…".to_string());
     save_daemon_status(status);
@@ -436,7 +436,7 @@ fn set_vpn_connected(
         .clone()
         .unwrap_or_else(|| "Unknown".to_string());
     status.message = message;
-    update_tray_icon(tray, vpn_state, Some(&status.location));
+    update_tray_icon(tray, items, vpn_state, Some(&status.location));
     save_daemon_status(status);
 }
 
@@ -451,7 +451,7 @@ fn set_vpn_disabled(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state, None);
+    update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
     status.message = None;
@@ -467,7 +467,7 @@ fn set_vpn_failed(
     *vpn_state = VpnState::Disabled;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state, None);
+    update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
     status.message = Some("Failed to enable VPN.".to_string());
@@ -486,7 +486,7 @@ fn set_vpn_dropped(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state, None);
+    update_tray_icon(tray, items, vpn_state, None);
     status.state = "Dropped".to_string();
     status.connected_since_unix = None;
     status.message = message;
@@ -504,7 +504,7 @@ fn set_vpn_unreachable(
     *connected_since = None;
     items.toggle.set_text("Enable VPN");
     items.toggle.set_enabled(true);
-    update_tray_icon(tray, vpn_state, None);
+    update_tray_icon(tray, items, vpn_state, None);
     status.state = "ServerUnreachable".to_string();
     status.connected_since_unix = None;
     status.message = Some("VPN server unreachable.".to_string());
@@ -675,7 +675,7 @@ fn handle_hc_event(
                 }
                 items.toggle.set_text("Disable VPN");
                 items.toggle.set_enabled(true);
-                update_tray_icon(tray, vpn_state, Some(&status.location));
+                update_tray_icon(tray, items, vpn_state, Some(&status.location));
                 status.state = "Connected".to_string();
                 status.message = None;
                 save_daemon_status(status);
@@ -767,6 +767,7 @@ fn handle_menu_event(
 // --------------------------------------------------------------------------
 
 struct MenuItems {
+    status_label: MenuItem,
     dashboard: MenuItem,
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
@@ -781,6 +782,8 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let menu = Menu::new();
 
     let setup_complete = config.setup_complete;
+    let status_label = MenuItem::new("Disconnected", false, None);
+    let sep0 = PredefinedMenuItem::separator();
     let dashboard = MenuItem::new("Status Dashboard", true, None);
     let sep1 = PredefinedMenuItem::separator();
     let toggle = MenuItem::new("Enable VPN", setup_complete, None);
@@ -802,6 +805,8 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let sep4 = PredefinedMenuItem::separator();
     let exit = MenuItem::new("Exit", true, None);
 
+    let _ = menu.append(&status_label);
+    let _ = menu.append(&sep0);
     let _ = menu.append(&dashboard);
     let _ = menu.append(&sep1);
     let _ = menu.append(&toggle);
@@ -828,6 +833,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         .expect("Failed to create tray icon");
 
     let items = MenuItems {
+        status_label,
         dashboard,
         toggle,
         location,
@@ -844,7 +850,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
 // Tray icon colour
 // --------------------------------------------------------------------------
 
-fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState, location: Option<&str>) {
+fn update_tray_icon(tray: &TrayIcon, items: &MenuItems, vpn_state: &VpnState, location: Option<&str>) {
     let color = match vpn_state {
         VpnState::Connected => &COLOR_GREEN,
         VpnState::Dropped => &COLOR_RED,
@@ -852,9 +858,9 @@ fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState, location: Option<&str
         VpnState::Enabling => &COLOR_BLUE,
         VpnState::Disabled => &COLOR_YELLOW,
     };
-    let tooltip = match vpn_state {
+    let label = match vpn_state {
         VpnState::Connected => format!(
-            "Connected: {}",
+            "Connected — {}",
             location.unwrap_or("Unknown")
         ),
         VpnState::Dropped => "Connection Dropped".to_string(),
@@ -866,5 +872,6 @@ fn update_tray_icon(tray: &TrayIcon, vpn_state: &VpnState, location: Option<&str
     if let Ok(icon) = tray_icon::Icon::from_rgba(rgba, 64, 64) {
         let _ = tray.set_icon(Some(icon));
     }
-    let _ = tray.set_tooltip(Some(&tooltip));
+    let _ = tray.set_tooltip(Some(&label));
+    items.status_label.set_text(&label);
 }
