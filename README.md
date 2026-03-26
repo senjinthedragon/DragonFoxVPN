@@ -25,7 +25,7 @@ internet, with this tray app managing routing on each client machine.
   - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
 - **Real-time Monitoring**:
   - Dashboard showing connection status, gateway IP, network adapter, and session duration.
-  - Tray icon changes colour based on status (green=Connected, yellow=Disabled, red=Dropped, grey=Server Unreachable).
+  - Tray icon changes colour based on status (green=Connected, blue=Enabling, yellow=Disabled, red=Dropped, grey=Server Unreachable).
   - System notifications for critical events (kill switch, unexpected drops, server unreachable).
 - **Localization**: Available in English, German, French, Spanish, Portuguese (Brazil), Italian, Russian, Simplified Chinese, Japanese, and Korean. Language is auto-detected from your system locale and can be changed in Settings.
 
