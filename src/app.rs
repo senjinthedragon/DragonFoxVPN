@@ -242,7 +242,8 @@ pub fn run_settings_window() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(&title)
-            .with_inner_size([460.0, 500.0])
+            .with_inner_size([340.0, 360.0])
+            .with_min_inner_size([300.0, 150.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -284,7 +285,8 @@ pub fn run_status_window() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(&title)
-            .with_inner_size([380.0, 500.0])
+            .with_inner_size([360.0, 220.0])
+            .with_min_inner_size([300.0, 80.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -307,7 +309,7 @@ pub fn run_location_window() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title(&title)
-            .with_inner_size([620.0, 700.0])
+            .with_inner_size([400.0, 550.0])
             .with_resizable(true),
         ..Default::default()
     };
@@ -463,7 +465,7 @@ impl eframe::App for SettingsWindow {
                 .show(ui, |ui| {
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_url"));
                     ui.add(egui::TextEdit::singleline(&mut self.switcher_url)
-                        .desired_width(f32::INFINITY));
+                        .desired_width(175.0));
                     ui.end_row();
                     ui.colored_label(egui::Color32::GRAY, t("settings.field_vpn_ip"));
                     ui.horizontal(|ui| {
@@ -525,19 +527,17 @@ impl eframe::App for SettingsWindow {
                     self.start_test();
                 }
                 if self.testing { ui.spinner(); }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(t("settings.btn_save")).clicked() {
-                        self.try_save(ctx);
-                    }
-                });
+                if ui.button(t("settings.btn_save")).clicked() {
+                    self.try_save(ctx);
+                }
             });
             ui.add_space(4.0);
         });
-        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |_| {});
+        egui::CentralPanel::default().show(ctx, |_| {});
         let h = panel.response.rect.height();
         if (h - self.last_height).abs() > 1.0 {
             self.last_height = h;
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(460.0, h)));
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(340.0, h)));
         }
     }
 }
@@ -604,19 +604,17 @@ impl SettingsWindow {
 // Status window
 // --------------------------------------------------------------------------
 
-struct StatusWindow {
-    last_height: f32,
-}
+struct StatusWindow;
 
 impl StatusWindow {
     fn new() -> Self {
-        Self { last_height: 0.0 }
+        Self
     }
 }
 
 impl eframe::App for StatusWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let panel = egui::TopBottomPanel::top("status_content").show(ctx, |ui| {
+        egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.colored_label(
                     egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
@@ -679,12 +677,6 @@ impl eframe::App for StatusWindow {
 
             ui.add_space(8.0);
         });
-        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |_| {});
-        let h = panel.response.rect.height();
-        if (h - self.last_height).abs() > 1.0 {
-            self.last_height = h;
-            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(380.0, h)));
-        }
 
         // Refresh once per second so the duration counter updates.
         ctx.request_repaint_after(Duration::from_secs(1));
@@ -887,7 +879,7 @@ impl eframe::App for LocationWindow {
 
                 let mut visible_iso: Vec<String> = Vec::new();
 
-                egui::ScrollArea::vertical().max_height(500.0).show(ui, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
                     let mut last_section: Option<String> = None;
                     for loc in &sorted {
                         if !lower_search.is_empty()
@@ -1282,7 +1274,7 @@ impl eframe::App for AboutWindow {
                     ui.add_space(10.0);
 
                     // Bitcoin donation
-                    ui.label(egui::RichText::new("₿  Bitcoin").strong());
+                    ui.label(egui::RichText::new("Bitcoin (BTC)").strong());
                     ui.add_space(4.0);
                     ui.add(
                         egui::Label::new(
