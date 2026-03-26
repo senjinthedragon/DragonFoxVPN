@@ -196,7 +196,7 @@ The pre-built binary requires `libxdo`, install it before running:
 # Arch-based
 sudo pacman -S xdotool
 
-# Debian/Ubuntu
+# Debian/Ubuntu (note: the pre-built binary is compiled on Arch and links against libxdo.so.4 — Ubuntu ships libxdo.so.3 and may not be compatible)
 sudo apt install libxdo3
 ```
 
