@@ -79,9 +79,22 @@ fn emergency_vpn_restore() {
 // --------------------------------------------------------------------------
 
 fn main() {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_secs()
-        .init();
+    let mut logger = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"));
+    logger.format_timestamp_secs();
+    // On Windows the console is suppressed, so also write logs to a file
+    // next to the executable so they can be inspected for debugging.
+    #[cfg(target_os = "windows")]
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let log_path = dir.join("dragonfoxvpn.log");
+            if let Ok(file) = std::fs::OpenOptions::new()
+                .create(true).append(true).open(&log_path)
+            {
+                logger.target(env_logger::Target::Pipe(Box::new(file)));
+            }
+        }
+    }
+    logger.init();
 
     // Restore normal routing on SIGINT / SIGTERM (e.g. system shutdown or kill).
     ctrlc::set_handler(|| {
