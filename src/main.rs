@@ -628,9 +628,30 @@ fn health_check_loop(
     tx: std::sync::mpsc::Sender<HcEvent>,
 ) {
     let mut drop_count: u32 = 0;
+    let mut location_tick: u32 = 0;
 
     loop {
         std::thread::sleep(Duration::from_secs(3));
+
+        // Refresh location from backend every 5 minutes so external
+        // location switches (e.g. via the Pi's web UI) are picked up.
+        // Each request triggers a sudo shell spawn on the Pi, so polling
+        // too aggressively (especially across multiple clients) adds up.
+        location_tick += 1;
+        if location_tick >= 100 {
+            location_tick = 0;
+            let config = AppConfig::load();
+            if let Some(url) = config.switcher_url {
+                let tx2 = tx.clone();
+                std::thread::spawn(move || {
+                    if let Ok((_, Some(label))) =
+                        dragonfox_vpn::api::VpnApi::fetch_locations(&url)
+                    {
+                        let _ = tx2.send(HcEvent::LocationFetched(label));
+                    }
+                });
+            }
+        }
 
         // Read current status from disk so we don't need shared memory.
         let status = match dragonfox_vpn::daemon_ipc::load_daemon_status() {
@@ -701,6 +722,9 @@ fn handle_hc_event(
         HcEvent::LocationFetched(label) => {
             status.location = label.clone();
             save_daemon_status(status);
+            if *vpn_state == VpnState::Connected {
+                update_tray_icon(tray, items, vpn_state, Some(&status.location));
+            }
             info!("Startup location sync from backend: {label}");
         }
         HcEvent::Recovered => {
@@ -831,9 +855,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let autoreconnect =
         CheckMenuItem::new("Auto-Reconnect if Server Returns", true, config.auto_reconnect, None);
     let autostart = if cfg!(target_os = "windows") {
-        let item = CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None);
-        let _ = menu.append(&item);
-        Some(item)
+        Some(CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None))
     } else {
         None
     };
@@ -851,6 +873,9 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&location);
     let _ = menu.append(&autoconnect);
     let _ = menu.append(&autoreconnect);
+    if let Some(ref a) = autostart {
+        let _ = menu.append(a);
+    }
     let _ = menu.append(&sep3);
     let _ = menu.append(&settings);
     let _ = menu.append(&sep4);

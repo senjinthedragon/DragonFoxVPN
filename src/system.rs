@@ -183,6 +183,8 @@ impl SystemHandler {
             run_command(&format!(
                 "netsh interface ipv4 set dns name=\"{adapter}\" source=dhcp"
             ));
+            // Renew DHCP to restore the default route that was removed above.
+            run_command(&format!("ipconfig /renew \"{adapter}\""));
         } else {
             run_command(&format!(
                 "sudo ip route del default via {vpn_gw} dev {adapter}"

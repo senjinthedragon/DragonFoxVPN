@@ -20,8 +20,15 @@ $wrapperScript = "/usr/local/bin/switch-openvpn.sh";
 $activeLink    = "/etc/openvpn/client/active.conf";
 $msg = "";
 
-// Auto-refresh location list on every page load
-exec("sudo " . escapeshellcmd($wrapperScript) . " --refresh 2>&1", $output, $ret);
+// Refresh the location list only when the .ovpn directory has changed
+// (new files added or removed). Comparing directory mtime against locations.txt
+// mtime avoids running a sudo subprocess on every page load.
+$ovpnDir  = "/etc/openvpn/client";
+$locMtime = file_exists($locationsFile) ? filemtime($locationsFile) : 0;
+$dirMtime = is_dir($ovpnDir)            ? filemtime($ovpnDir)       : 0;
+if ($dirMtime > $locMtime) {
+    exec("sudo " . escapeshellcmd($wrapperScript) . " --refresh 2>&1");
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['location'])) {
     $target = basename($_POST['location']);
