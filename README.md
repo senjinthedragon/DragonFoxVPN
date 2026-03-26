@@ -164,6 +164,12 @@ Open the file and edit two lines to match your setup:
 - `ServerName` - the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
 - `Require ip` - your LAN subnet (e.g. `192.168.1.0/24`)
 
+> [!CAUTION]
+> The web UI has **no authentication**. The `Require ip` directive is the only thing preventing
+> unauthorised access to the location switcher. If your Pi is directly reachable from the internet
+> (e.g. via a port-forwarded public IP), anyone on the internet can switch your VPN location.
+> Ensure the Pi's web port is **not** exposed beyond your LAN, or add HTTP Basic Auth on top.
+
 ```bash
 sudo a2ensite vpn
 sudo systemctl reload apache2
@@ -173,36 +179,14 @@ sudo systemctl reload apache2
 
 ## Tray App Setup
 
-### Prerequisites
+### Download
 
-- **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
-- **Windows**: MSVC build tools (Visual Studio Build Tools or Visual Studio with the C++ workload)
-- **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
+Pre-built binaries for Windows and Linux are available on the [GitHub Releases page](https://github.com/senjinthedragon/DragonFoxVPN/releases). Download the binary for your platform and skip straight to the configuration steps below.
 
-```bash
-# Arch/Garuda
-sudo pacman -S libayatana-appindicator
+- **Windows**: `DragonFoxVPN.exe` — run as Administrator
+- **Linux**: `DragonFoxVPN` — make it executable (`chmod +x DragonFoxVPN`) and run it normally
 
-# Debian/Ubuntu
-sudo apt install libayatana-appindicator3-dev
-```
-
-### Building
-
-```bash
-cargo build --release
-```
-
-The output binary is placed at:
-
-- **Linux**: `target/release/DragonFoxVPN`
-- **Windows**: `target\release\DragonFoxVPN.exe`
-
-On Windows you can also use the included PowerShell script:
-
-```powershell
-.\build_windows.ps1
-```
+If you'd rather build from source, see [Building the Executables Yourself](#building-the-executables-yourself) at the bottom of this file.
 
 ### Linux: passwordless sudo for network commands
 
@@ -308,6 +292,43 @@ Flag icons are cached locally in a `flags` subdirectory alongside the config fil
 
 - The app removes the VPN route but your default route should return automatically
 - If internet is still broken, run: `sudo ip route add default via <your-router-ip>`
+
+---
+
+## Building the Executables Yourself
+
+If you prefer to build from source rather than using a pre-built release binary:
+
+### Prerequisites
+
+- **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
+- **Windows**: MSVC build tools (Visual Studio Build Tools or Visual Studio with the C++ workload)
+- **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
+
+```bash
+# Arch/Garuda
+sudo pacman -S libayatana-appindicator
+
+# Debian/Ubuntu
+sudo apt install libayatana-appindicator3-dev
+```
+
+### Build
+
+```bash
+cargo build --release
+```
+
+The output binary is placed at:
+
+- **Linux**: `target/release/DragonFoxVPN`
+- **Windows**: `target\release\DragonFoxVPN.exe`
+
+On Windows you can also use the included PowerShell script:
+
+```powershell
+.\build_windows.ps1
+```
 
 ---
 
