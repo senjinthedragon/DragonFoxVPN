@@ -163,11 +163,7 @@ pub fn t_fmt(key: &str, args: &[(&str, &str)]) -> String {
 /// attempt to load a system CJK font and register it with egui so the
 /// characters render correctly. On systems without such a font this is a no-op.
 pub fn apply_cjk_font_if_needed(ctx: &egui::Context) {
-    let lang = detected_language();
-    if !matches!(lang, "zh_CN" | "ja" | "ko") {
-        return;
-    }
-    if let Some(path) = find_cjk_font(lang) {
+    if let Some(path) = find_cjk_font(detected_language()) {
         if let Ok(bytes) = std::fs::read(&path) {
             let mut fonts = egui::FontDefinitions::default();
             fonts
@@ -186,14 +182,14 @@ pub fn apply_cjk_font_if_needed(ctx: &egui::Context) {
 fn find_cjk_font(lang: &str) -> Option<std::path::PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        let windir =
-            std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
+        let windir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
         let fonts_dir = std::path::Path::new(&windir).join("Fonts");
+        // Language-specific preferred fonts first, then universal fallbacks.
         let candidates: &[&str] = match lang {
             "zh_CN" => &["msyh.ttc", "msyhbd.ttc", "simhei.ttf", "simsun.ttc"],
-            "ja" => &["meiryo.ttc", "YuGothR.ttc", "msgothic.ttc"],
-            "ko" => &["malgun.ttf", "gulim.ttc"],
-            _ => &[],
+            "ja"    => &["meiryo.ttc", "YuGothR.ttc", "msgothic.ttc"],
+            "ko"    => &["malgun.ttf", "gulim.ttc"],
+            _       => &["msyh.ttc", "meiryo.ttc", "malgun.ttf", "simsun.ttc"],
         };
         for name in candidates {
             let p = fonts_dir.join(name);
@@ -204,29 +200,22 @@ fn find_cjk_font(lang: &str) -> Option<std::path::PathBuf> {
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let candidates: &[&str] = match lang {
-            "zh_CN" => &[
-                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf",
-                "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
-            ],
-            "ja" => &[
-                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/truetype/noto/NotoSansCJKjp-Regular.otf",
-            ],
-            "ko" => &[
-                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-                "/usr/share/fonts/truetype/noto/NotoSansCJKkr-Regular.otf",
-            ],
-            _ => &[],
+        // The pan-CJK Noto font covers all CJK scripts and Cyrillic, so it
+        // works as a universal fallback regardless of the active language.
+        let universal: &[&str] = &[
+            "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+        ];
+        // Language-specific extras tried first, then fall through to universal.
+        let extras: &[&str] = match lang {
+            "zh_CN" => &["/usr/share/fonts/truetype/noto/NotoSansCJKsc-Regular.otf"],
+            "ja"    => &["/usr/share/fonts/truetype/noto/NotoSansCJKjp-Regular.otf"],
+            "ko"    => &["/usr/share/fonts/truetype/noto/NotoSansCJKkr-Regular.otf"],
+            _       => &[],
         };
-        for path in candidates {
+        for path in extras.iter().chain(universal.iter()) {
             let p = std::path::Path::new(path);
             if p.exists() {
                 return Some(p.to_path_buf());
