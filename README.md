@@ -17,10 +17,10 @@ internet, with this tray app managing routing on each client machine.
   - Favorites system
 - **Smart Automation**:
   - **Auto-Connect**: Connects to the last used location on app launch.
-  - **Auto-Reconnect**: Optionally re-enables the VPN automatically when the server comes back online after a drop. Disabled by default — see the security note below.
+  - **Auto-Reconnect**: Optionally re-enables the VPN automatically when the server comes back online after a drop. Disabled by default - see the security note below.
   - **Auto-Start**: (Windows) Option to launch automatically on system login.
 - **Security & Safety**:
-  - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly. When the VPN drops, the route is immediately removed and all traffic stops until you manually re-enable it — or until the server returns if Auto-Reconnect is enabled.
+  - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly. When the VPN drops, the route is immediately removed and all traffic stops until you manually re-enable it - or until the server returns if Auto-Reconnect is enabled.
   - **Drop Debouncing**: Requires two consecutive failed checks before triggering the kill switch, avoiding false positives.
   - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
 - **Real-time Monitoring**:
@@ -29,7 +29,7 @@ internet, with this tray app managing routing on each client machine.
 
 ## Security Note: Kill Switch and Auto-Reconnect
 
-By default, when the VPN drops the kill switch removes the routing rule and **all internet traffic stops** until you manually click "Enable VPN". This is intentional — it ensures no unprotected traffic ever leaves your machine without your explicit action.
+By default, when the VPN drops the kill switch removes the routing rule and **all internet traffic stops** until you manually click "Enable VPN". This is intentional - it ensures no unprotected traffic ever leaves your machine without your explicit action.
 
 The **Auto-Reconnect** option (`Auto-Reconnect if Server Returns` in the tray menu) will automatically re-enable the VPN when the server comes back online. This is convenient for situations like a scheduled Pi reboot, but it comes with a trade-off: you are trusting that the reconnection will succeed and that no traffic slips through in the window between the kill switch firing and the VPN being restored. If you use the VPN for strict privacy or to protect sensitive downloads, leave Auto-Reconnect **off** and reconnect manually.
 

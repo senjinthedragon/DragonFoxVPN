@@ -67,11 +67,11 @@ fn acquire_ui_lock(mode: &str) -> Option<UiLock> {
         if let Ok(pid) = contents.trim().parse::<u32>() {
             !pid_is_running(pid)
         } else {
-            // Unreadable/empty lock — treat as stale.
+            // Unreadable/empty lock - treat as stale.
             true
         }
     } else {
-        // Can't read the file — treat as stale.
+        // Can't read the file - treat as stale.
         true
     };
 
@@ -862,7 +862,7 @@ impl IpInput {
             // Collect which field should receive focus after all fields are
             // rendered. Advancing focus mid-loop causes the dot event to
             // propagate into the next field's TextEdit in the same frame,
-            // which then advances again — skipping all the way to the last box.
+            // which then advances again - skipping all the way to the last box.
             let mut focus_next: Option<usize> = None;
 
             for i in 0..4usize {

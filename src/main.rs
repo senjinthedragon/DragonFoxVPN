@@ -526,15 +526,15 @@ fn do_enable_vpn(adapter: &str, config: &AppConfig) -> bool {
     // The routing commands may return exit 0 yet the route may have been
     // immediately reverted (e.g. by NetworkManager).
     if !SystemHandler::is_route_active(&vpn_gw, adapter) {
-        warn!("enable_vpn returned ok but route is not present — treating as failure.");
+        warn!("enable_vpn returned ok but route is not present - treating as failure.");
         return false;
     }
     // Verify traffic is actually flowing through the VPN gateway by checking
     // the first traceroute hop. The route existing is necessary but not
-    // sufficient — the gateway may not be forwarding through the tunnel.
+    // sufficient - the gateway may not be forwarding through the tunnel.
     let isp_gw = config.isp_gateway.clone().unwrap_or_default();
     if !SystemHandler::check_connection(&vpn_gw, &isp_gw) {
-        warn!("enable_vpn: route present but traffic check failed — not going green.");
+        warn!("enable_vpn: route present but traffic check failed - not going green.");
         return false;
     }
     set_vpn_active(adapter, &vpn_gw);
@@ -860,7 +860,7 @@ fn update_tray_icon(tray: &TrayIcon, items: &MenuItems, vpn_state: &VpnState, lo
     };
     let label = match vpn_state {
         VpnState::Connected => format!(
-            "Connected — {}",
+            "Connected - {}",
             location.unwrap_or("Unknown")
         ),
         VpnState::Dropped => "Connection Dropped".to_string(),
