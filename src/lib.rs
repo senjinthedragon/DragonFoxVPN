@@ -33,7 +33,7 @@ pub fn single_instance_check() -> bool {
 
 #[cfg(target_os = "windows")]
 fn single_instance_check_windows() -> bool {
-    // Use a named mutex — the correct Windows single-instance pattern.
+    // Use a named mutex - the correct Windows single-instance pattern.
     // Only the daemon creates/holds this mutex; --ui subprocesses never call
     // single_instance_check, so they don't interfere. tasklist-based counting
     // incorrectly includes subprocesses and breaks on restart.
@@ -56,7 +56,7 @@ fn single_instance_check_windows() -> bool {
         if handle.is_null() {
             return true; // couldn't create mutex, allow startup
         }
-        // Intentionally leak the handle — it keeps the mutex alive until the
+        // Intentionally leak the handle - it keeps the mutex alive until the
         // process exits, at which point the OS releases it automatically.
         GetLastError() != ERROR_ALREADY_EXISTS
     }

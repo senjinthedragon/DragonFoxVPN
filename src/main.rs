@@ -517,7 +517,7 @@ fn set_vpn_disabled(
     save_daemon_status(status);
 }
 
-/// Called when enable_vpn returns false — routing never came up. Sets a failure message.
+/// Called when enable_vpn returns false - routing never came up. Sets a failure message.
 fn set_vpn_failed(
     tray: &TrayIcon,
     items: &MenuItems,
@@ -648,7 +648,7 @@ enum HcEvent {
     Unreachable,
     /// Was Dropped/Unreachable but health checks now pass again.
     Recovered,
-    /// Still connected and healthy — sent every check cycle while connected.
+    /// Still connected and healthy - sent every check cycle while connected.
     Healthy,
     /// Location label fetched from the backend (startup sync or 5-min refresh).
     LocationFetched(String),

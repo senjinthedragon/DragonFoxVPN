@@ -183,8 +183,8 @@ sudo systemctl reload apache2
 
 Pre-built binaries for Windows and Linux are available on the [GitHub Releases page](https://github.com/senjinthedragon/DragonFoxVPN/releases). Download the binary for your platform and skip straight to the configuration steps below.
 
-- **Windows**: `DragonFoxVPN.exe` — Windows will prompt for administrator rights on launch
-- **Linux**: `DragonFoxVPN` — make it executable (`chmod +x DragonFoxVPN`) and run it normally
+- **Windows**: `DragonFoxVPN.exe` - Windows will prompt for administrator rights on launch
+- **Linux**: `DragonFoxVPN` - make it executable (`chmod +x DragonFoxVPN`) and run it normally
 
 If you'd rather build from source, see [Building the Executables Yourself](#building-the-executables-yourself) at the bottom of this file.
 
@@ -235,7 +235,7 @@ Access **Settings...** from the tray menu at any time to update network configur
 
 ### Windows
 
-Run `DragonFoxVPN.exe` — Windows will automatically prompt for administrator rights (required to modify the routing table).
+Run `DragonFoxVPN.exe` - Windows will automatically prompt for administrator rights (required to modify the routing table).
 
 ### Linux
 
@@ -302,7 +302,7 @@ If you prefer to build from source rather than using a pre-built release binary:
 ### Prerequisites
 
 - **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
-- **Windows**: The default Rust toolchain on Windows uses the MSVC linker, so you need [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (free, standalone) or a full Visual Studio install with the "Desktop development with C++" workload — this provides the linker, not any C++ compilation
+- **Windows**: The default Rust toolchain on Windows uses the MSVC linker, so you need [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (free, standalone) or a full Visual Studio install with the "Desktop development with C++" workload - this provides the linker, not any C++ compilation
 - **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
 
 ```bash

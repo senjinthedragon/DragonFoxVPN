@@ -21,7 +21,7 @@ pub enum VpnState {
 impl VpnState {
     /// Returns the display string. Note: `DaemonStatus.state` uses different
     /// canonical wire strings ("Connected", "Disabled", etc.) written directly
-    /// in the set_vpn_* functions in main.rs — not this method.
+    /// in the set_vpn_* functions in main.rs - not this method.
     pub fn as_str(&self) -> &'static str {
         match self {
             VpnState::Disabled => "Disabled",
