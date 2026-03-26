@@ -2,7 +2,7 @@
 
 A system tray utility for managing VPN connections with a modern dark UI.
 
-Designed to work on **Windows 10/11** and **Linux**. Built around a
+Designed to work on **Windows 10/11** and **Linux** (X11 and Wayland). Built around a
 **Raspberry Pi gateway** architecture where a Pi running OpenVPN sits between your LAN and the
 internet, with this tray app managing routing on each client machine.
 
