@@ -22,6 +22,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ctrlc = "3"
 notify-rust = "4"
+sys-locale = "0.3"
 log = "0.4"
 env_logger = "0.11"
 directories = "5"

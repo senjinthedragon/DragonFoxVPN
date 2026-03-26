@@ -17,6 +17,7 @@ use log::{error, info, warn};
 
 use crate::api::{country_to_iso, Location, VpnApi};
 use crate::config::AppConfig;
+use crate::locale::{t, t_fmt};
 use crate::daemon_ipc::{
     current_unix_ts, load_daemon_status, write_daemon_command, DaemonCommand,
 };
@@ -133,6 +134,7 @@ fn run_native_with_fallback(
         glow_options,
         Box::new(move |cc| {
             cc.egui_ctx.set_visuals(visuals_clone);
+            crate::locale::apply_cjk_font_if_needed(&cc.egui_ctx);
             Ok(make_app_clone.lock().unwrap().take().unwrap()())
         }),
     );
@@ -146,6 +148,7 @@ fn run_native_with_fallback(
             wgpu_options,
             Box::new(move |cc| {
                 cc.egui_ctx.set_visuals(visuals);
+                crate::locale::apply_cjk_font_if_needed(&cc.egui_ctx);
                 Ok(make_app.lock().unwrap().take().unwrap()())
             }),
         ) {
@@ -256,20 +259,21 @@ pub fn run_settings_window() {
     let cfg = AppConfig::load();
     let first_run = !cfg.setup_complete;
 
+    let title = if first_run {
+        t("settings.title_setup")
+    } else {
+        t("settings.title_settings")
+    };
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title(if first_run {
-                "DragonFoxVPN - Initial Setup"
-            } else {
-                "DragonFoxVPN - Settings"
-            })
+            .with_title(&title)
             .with_inner_size([460.0, 500.0])
             .with_resizable(false),
         ..Default::default()
     };
 
     run_native_with_fallback(
-        "DragonFoxVPN Settings",
+        &title,
         options,
         move || Box::new(SettingsWindow::new(first_run)),
     );
@@ -282,16 +286,17 @@ pub fn run_status_window() {
         None => return,
     };
 
+    let title = t("status_win.title");
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DragonFoxVPN - Status")
+            .with_title(&title)
             .with_inner_size([380.0, 500.0])
             .with_resizable(false),
         ..Default::default()
     };
 
     run_native_with_fallback(
-        "DragonFoxVPN Status",
+        &title,
         options,
         || Box::new(StatusWindow::new()),
     );
@@ -304,16 +309,17 @@ pub fn run_location_window() {
         None => return,
     };
 
+    let title = t("location_win.title");
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_title("DragonFoxVPN - Change Location")
+            .with_title(&title)
             .with_inner_size([620.0, 700.0])
             .with_resizable(true),
         ..Default::default()
     };
 
     run_native_with_fallback(
-        "DragonFoxVPN Location",
+        &title,
         options,
         || Box::new(LocationWindow::new()),
     );
@@ -367,7 +373,7 @@ impl eframe::App for SettingsWindow {
         // Block close on first run until setup is saved.
         if ctx.input(|i| i.viewport().close_requested()) && self.first_run && !self.saved {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.message = Some("Setup is required to use DragonFoxVPN.".to_string());
+            self.message = Some(t("settings.msg_setup_required"));
         }
 
         // Trigger VPN IP auto-resolve when the switcher URL changes.
@@ -412,14 +418,14 @@ impl eframe::App for SettingsWindow {
         let panel = egui::TopBottomPanel::top("settings_content").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.heading(if self.first_run {
-                    "Initial Setup"
+                    t("settings.heading_setup")
                 } else {
-                    "Network Settings"
+                    t("settings.heading_settings")
                 });
                 if self.first_run {
                     ui.colored_label(
                         egui::Color32::GRAY,
-                        "Enter your network details to get started.",
+                        t("settings.subtitle_setup"),
                     );
                 }
             });
@@ -429,10 +435,10 @@ impl eframe::App for SettingsWindow {
                 .num_columns(2)
                 .spacing([8.0, 6.0])
                 .show(ui, |ui| {
-                    ui.colored_label(egui::Color32::GRAY, "VPN Switcher URL");
+                    ui.colored_label(egui::Color32::GRAY, t("settings.field_url"));
                     ui.text_edit_singleline(&mut self.switcher_url);
                     ui.end_row();
-                    ui.colored_label(egui::Color32::GRAY, "VPN Server IP");
+                    ui.colored_label(egui::Color32::GRAY, t("settings.field_vpn_ip"));
                     ui.horizontal(|ui| {
                         self.vpn_gateway.show(ui, "vpn_gw");
                         if self.resolving {
@@ -440,7 +446,7 @@ impl eframe::App for SettingsWindow {
                         }
                     });
                     ui.end_row();
-                    ui.colored_label(egui::Color32::GRAY, "Router IP");
+                    ui.colored_label(egui::Color32::GRAY, t("settings.field_router_ip"));
                     self.isp_gateway.show(ui, "isp_gw");
                     ui.end_row();
                 });
@@ -460,7 +466,7 @@ impl eframe::App for SettingsWindow {
             }
 
             if let Some(ref msg) = self.message.clone() {
-                let color = if msg.starts_with("Saved") {
+                let color = if self.saved {
                     egui::Color32::LIGHT_GREEN
                 } else {
                     egui::Color32::LIGHT_RED
@@ -472,7 +478,7 @@ impl eframe::App for SettingsWindow {
             let busy = self.testing || self.resolving;
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(!busy, egui::Button::new("Test Connection"))
+                    .add_enabled(!busy, egui::Button::new(t("settings.btn_test")))
                     .clicked()
                 {
                     self.start_test();
@@ -481,7 +487,7 @@ impl eframe::App for SettingsWindow {
                     ui.spinner();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Save Settings").clicked() {
+                    if ui.button(t("settings.btn_save")).clicked() {
                         self.try_save(ctx);
                     }
                 });
@@ -517,13 +523,11 @@ impl SettingsWindow {
         let url = self.switcher_url.trim().trim_end_matches('/').to_string();
 
         if !self.vpn_gateway.is_valid() || !self.isp_gateway.is_valid() {
-            self.message =
-                Some("VPN Server IP and Router IP must be complete, valid IPv4 addresses.".to_string());
+            self.message = Some(t("settings.msg_invalid_ip"));
             return;
         }
         if url.is_empty() || (!url.starts_with("http://") && !url.starts_with("https://")) {
-            self.message =
-                Some("Switcher URL must start with http:// or https://".to_string());
+            self.message = Some(t("settings.msg_invalid_url"));
             return;
         }
 
@@ -543,7 +547,7 @@ impl SettingsWindow {
 
         let adapter = SystemHandler::get_active_adapter();
         info!("Settings saved. Active adapter: {adapter}");
-        self.message = Some("Saved settings.".to_string());
+        self.message = Some(t("settings.msg_saved"));
         self.saved = true;
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
@@ -576,12 +580,12 @@ impl eframe::App for StatusWindow {
 
             if let Some(status) = load_daemon_status() {
                 let (state_color, state_text) = match status.state.as_str() {
-                    "Connected" => (egui::Color32::LIGHT_GREEN, "CONNECTED"),
-                    "Enabling" => (egui::Color32::from_rgb(0x00, 0x7A, 0xCC), "CONNECTING…"),
-                    "Dropped" => (egui::Color32::LIGHT_RED, "DROPPED"),
-                    "ServerUnreachable" => (egui::Color32::GRAY, "SERVER UNREACHABLE"),
-                    "SetupIncomplete" => (egui::Color32::GRAY, "SETUP INCOMPLETE"),
-                    _ => (egui::Color32::YELLOW, "DISABLED"),
+                    "Connected" => (egui::Color32::LIGHT_GREEN, t("status_win.state_connected")),
+                    "Enabling" => (egui::Color32::from_rgb(0x00, 0x7A, 0xCC), t("status_win.state_connecting")),
+                    "Dropped" => (egui::Color32::LIGHT_RED, t("status_win.state_dropped")),
+                    "ServerUnreachable" => (egui::Color32::GRAY, t("status_win.state_unreachable")),
+                    "SetupIncomplete" => (egui::Color32::GRAY, t("status_win.state_setup_incomplete")),
+                    _ => (egui::Color32::YELLOW, t("status_win.state_disabled")),
                 };
 
                 egui::Frame::none()
@@ -598,12 +602,12 @@ impl eframe::App for StatusWindow {
                     });
 
                 ui.add_space(8.0);
-                ui.label(format!("Location: {}", status.location));
-                ui.label(format!(
-                    "Gateway: {}",
-                    status.vpn_gateway.as_deref().unwrap_or("N/A")
+                ui.label(t_fmt("status_win.location", &[("value", &status.location)]));
+                ui.label(t_fmt(
+                    "status_win.gateway",
+                    &[("value", status.vpn_gateway.as_deref().unwrap_or("N/A"))],
                 ));
-                ui.label(format!("Adapter: {}", status.adapter));
+                ui.label(t_fmt("status_win.adapter", &[("value", &status.adapter)]));
 
                 let duration_str = if let Some(since) = status.connected_since_unix {
                     let elapsed = current_unix_ts().saturating_sub(since);
@@ -616,17 +620,14 @@ impl eframe::App for StatusWindow {
                 } else {
                     "--:--:--".to_string()
                 };
-                ui.label(format!("Duration: {duration_str}"));
+                ui.label(t_fmt("status_win.duration", &[("value", &duration_str)]));
 
                 if let Some(ref msg) = status.message {
                     ui.add_space(4.0);
                     ui.colored_label(egui::Color32::GRAY, msg);
                 }
             } else {
-                ui.colored_label(
-                    egui::Color32::YELLOW,
-                    "Waiting for daemon status…\nIs the tray daemon running?",
-                );
+                ui.colored_label(egui::Color32::YELLOW, t("status_win.waiting"));
             }
 
             ui.add_space(8.0);
@@ -782,8 +783,9 @@ impl eframe::App for LocationWindow {
                     // Verify the backend actually switched to the location we requested.
                     let requested = self.selected_label.as_deref().unwrap_or("");
                     if !confirmed_label.eq_ignore_ascii_case(requested) {
-                        self.switch_status = Some(format!(
-                            "Switch failed: backend is still on {confirmed_label}"
+                        self.switch_status = Some(t_fmt(
+                            "location_win.switch_failed",
+                            &[("location", &confirmed_label)],
                         ));
                         self.switch_ok = false;
                         self.is_switching = false;
@@ -801,7 +803,7 @@ impl eframe::App for LocationWindow {
                     ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 }
                 LocationMsg::SwitchDone(Err(e)) => {
-                    self.switch_status = Some(format!("Error: {e}"));
+                    self.switch_status = Some(t_fmt("location_win.switch_error", &[("msg", &e)]));
                     self.switch_ok = false;
                     self.is_switching = false;
                 }
@@ -810,19 +812,19 @@ impl eframe::App for LocationWindow {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                ui.heading("Select VPN Location");
+                ui.heading(t("location_win.heading"));
             });
             ui.add_space(8.0);
 
             ui.add(
                 egui::TextEdit::singleline(&mut self.search_text)
-                    .hint_text("Search countries or cities..."),
+                    .hint_text(t("location_win.search_hint")),
             );
             ui.add_space(4.0);
 
             if self.is_loading {
                 ui.spinner();
-                ui.label("Loading locations...");
+                ui.label(t("location_win.loading"));
             } else {
                 let favorites = self.cfg.favorites.clone();
                 let lower_search = self.search_text.to_lowercase();
@@ -849,7 +851,7 @@ impl eframe::App for LocationWindow {
 
                         let is_fav = favorites.contains(&loc.label);
                         let section = if is_fav {
-                            "Favorites".to_string()
+                            t("location_win.favorites")
                         } else {
                             loc.continent.clone()
                         };
@@ -929,9 +931,9 @@ impl eframe::App for LocationWindow {
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         ui.spinner();
-                        ui.label(format!(
-                            "Switching to {}…",
-                            self.selected_label.as_deref().unwrap_or("location")
+                        ui.label(t_fmt(
+                            "location_win.switching",
+                            &[("location", self.selected_label.as_deref().unwrap_or("…"))],
                         ));
                     });
                 }
@@ -1084,40 +1086,45 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
     if url.starts_with("http://") || url.starts_with("https://") {
         match VpnApi::fetch_locations(&url) {
             Ok((locs, _)) if !locs.is_empty() => {
-                results.push((format!("Switcher URL: {} locations found", locs.len()), true));
+                results.push((
+                    t_fmt("test.url_ok", &[("count", &locs.len().to_string())]),
+                    true,
+                ));
             }
             Ok(_) => {
-                results.push(("Switcher URL: reached but no locations found - wrong page?".to_string(), false));
+                results.push((t("test.url_wrong_page"), false));
             }
             Err(e) => {
                 let msg = simplify_network_error(&e);
-                results.push((format!("Switcher URL: {msg}"), false));
+                results.push((t_fmt("test.url_error", &[("msg", &msg)]), false));
             }
         }
     } else {
-        results.push(("Switcher URL: not set or invalid".to_string(), false));
+        results.push((t("test.url_not_set"), false));
     }
 
     // 2. VPN Server IP - ping.
     if vpn_ip.split('.').count() == 4 && !vpn_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&vpn_ip);
+        let status_str = if ok { t("test.reachable") } else { t("test.unreachable") };
         results.push((
-            format!("VPN Server ({vpn_ip}): {}", if ok { "reachable" } else { "unreachable" }),
+            t_fmt("test.vpn_server", &[("ip", &vpn_ip), ("status", &status_str)]),
             ok,
         ));
     } else {
-        results.push(("VPN Server IP: not set".to_string(), false));
+        results.push((t("test.vpn_server_not_set"), false));
     }
 
     // 3. Router IP - ping.
     if router_ip.split('.').count() == 4 && !router_ip.starts_with('.') {
         let ok = SystemHandler::ping_host(&router_ip);
+        let status_str = if ok { t("test.reachable") } else { t("test.unreachable") };
         results.push((
-            format!("Router ({router_ip}): {}", if ok { "reachable" } else { "unreachable" }),
+            t_fmt("test.router", &[("ip", &router_ip), ("status", &status_str)]),
             ok,
         ));
     } else {
-        results.push(("Router IP: not set".to_string(), false));
+        results.push((t("test.router_not_set"), false));
     }
 
     results

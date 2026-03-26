@@ -27,6 +27,7 @@ use tray_icon::{
 
 use dragonfox_vpn::autostart::AutoStartManager;
 use dragonfox_vpn::config::AppConfig;
+use dragonfox_vpn::locale::{t, t_fmt};
 use dragonfox_vpn::daemon_ipc::{
     clear_daemon_command, current_unix_ts, save_daemon_status, take_daemon_command, DaemonCommand,
     DaemonStatus,
@@ -95,6 +96,9 @@ fn main() {
         }
     }
     logger.init();
+
+    // Initialise localisation before any user-visible strings are produced.
+    dragonfox_vpn::locale::init();
 
     // Restore normal routing on SIGINT / SIGTERM (e.g. system shutdown or kill).
     ctrlc::set_handler(|| {
@@ -292,10 +296,10 @@ fn run_tray_daemon() {
                 items.autoreconnect.set_enabled(true);
                 if let Some(ref a) = items.autostart { a.set_enabled(true); }
                 let setup_done = config.setup_complete;
-                items.toggle.set_text(if vpn_state == VpnState::Connected {
-                    "Disable VPN"
+                items.toggle.set_text(&if vpn_state == VpnState::Connected {
+                    t("tray.disable_vpn")
                 } else {
-                    "Enable VPN"
+                    t("tray.enable_vpn")
                 });
                 items.toggle.set_enabled(setup_done && vpn_state != VpnState::Enabling);
                 items.location.set_enabled(setup_done);
@@ -340,10 +344,10 @@ fn run_tray_daemon() {
                         .unwrap_or_else(|| "Unknown".to_string());
                     let setup_now = config.setup_complete;
                     if setup_now {
-                        items.toggle.set_text(if vpn_state == VpnState::Connected {
-                            "Disable VPN"
+                        items.toggle.set_text(&if vpn_state == VpnState::Connected {
+                            t("tray.disable_vpn")
                         } else {
-                            "Enable VPN"
+                            t("tray.enable_vpn")
                         });
                         items.toggle.set_enabled(
                             vpn_state != VpnState::Enabling,
@@ -388,7 +392,7 @@ fn run_tray_daemon() {
                             &mut connected_since,
                             &mut daemon_status,
                             &config,
-                            Some("Reconnected after location switch.".to_string()),
+                            Some(t("status.reconnected")),
                         );
                     } else {
                         set_vpn_failed(&tray, &items, &mut vpn_state, &mut daemon_status);
@@ -445,11 +449,11 @@ fn set_vpn_enabling(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Enabling;
-    items.toggle.set_text("Enable VPN");
+    items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(false);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Enabling".to_string();
-    status.message = Some("Connecting…".to_string());
+    status.message = Some(t("status.connecting"));
     save_daemon_status(status);
 }
 
@@ -464,7 +468,7 @@ fn set_vpn_connected(
 ) {
     *vpn_state = VpnState::Connected;
     *connected_since = Some(Instant::now());
-    items.toggle.set_text("Disable VPN");
+    items.toggle.set_text(&t("tray.disable_vpn"));
     items.toggle.set_enabled(true);
     status.state = "Connected".to_string();
     status.connected_since_unix = Some(current_unix_ts());
@@ -475,7 +479,7 @@ fn set_vpn_connected(
         if !existing.is_empty() && existing != "Unknown" {
             existing
         } else {
-            "Unknown".to_string()
+            "Unknown".to_string() // internal sentinel; never shown raw
         }
     });
     status.message = message;
@@ -492,7 +496,7 @@ fn set_vpn_disabled(
 ) {
     *vpn_state = VpnState::Disabled;
     *connected_since = None;
-    items.toggle.set_text("Enable VPN");
+    items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
@@ -508,12 +512,12 @@ fn set_vpn_failed(
     status: &mut DaemonStatus,
 ) {
     *vpn_state = VpnState::Disabled;
-    items.toggle.set_text("Enable VPN");
+    items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Disabled".to_string();
     status.connected_since_unix = None;
-    status.message = Some("Failed to enable VPN.".to_string());
+    status.message = Some(t("status.failed"));
     save_daemon_status(status);
 }
 
@@ -527,7 +531,7 @@ fn set_vpn_dropped(
 ) {
     *vpn_state = VpnState::Dropped;
     *connected_since = None;
-    items.toggle.set_text("Enable VPN");
+    items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "Dropped".to_string();
@@ -545,12 +549,12 @@ fn set_vpn_unreachable(
 ) {
     *vpn_state = VpnState::ServerUnreachable;
     *connected_since = None;
-    items.toggle.set_text("Enable VPN");
+    items.toggle.set_text(&t("tray.enable_vpn"));
     items.toggle.set_enabled(true);
     update_tray_icon(tray, items, vpn_state, None);
     status.state = "ServerUnreachable".to_string();
     status.connected_since_unix = None;
-    status.message = Some("VPN server unreachable.".to_string());
+    status.message = Some(t("status.vpn_unreachable"));
     save_daemon_status(status);
 }
 
@@ -733,8 +737,8 @@ fn handle_hc_event(
                 && status.location != label
             {
                 dragonfox_vpn::notifications::notify(
-                    "VPN Location Changed",
-                    &format!("Location changed to {label}."),
+                    &t("notify.location_changed_title"),
+                    &t_fmt("notify.location_changed_body", &[("location", &label)]),
                 );
             }
             status.location = label.clone();
@@ -751,7 +755,7 @@ fn handle_hc_event(
                     *connected_since = Some(Instant::now());
                     status.connected_since_unix = Some(current_unix_ts());
                 }
-                items.toggle.set_text("Disable VPN");
+                items.toggle.set_text(&t("tray.disable_vpn"));
                 items.toggle.set_enabled(true);
                 update_tray_icon(tray, items, vpn_state, Some(&status.location));
                 status.state = "Connected".to_string();
@@ -763,30 +767,30 @@ fn handle_hc_event(
         HcEvent::Dropped { kill_switched } => {
             if *vpn_state != VpnState::Dropped {
                 let msg = if kill_switched {
-                    "Kill switch activated - routing cleared."
+                    t("status.kill_switch")
                 } else {
-                    "VPN route lost unexpectedly."
+                    t("status.route_lost")
                 };
                 if kill_switched {
                     dragonfox_vpn::notifications::notify(
-                        "Kill Switch Activated",
-                        "VPN dropped - internet blocked to prevent traffic leaks.",
+                        &t("notify.kill_switch_title"),
+                        &t("notify.kill_switch_body"),
                     );
                 } else {
                     dragonfox_vpn::notifications::notify(
-                        "VPN Connection Dropped",
-                        "The VPN route was lost unexpectedly.",
+                        &t("notify.dropped_title"),
+                        &t("notify.dropped_body"),
                     );
                 }
-                set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg.to_string()));
                 error!("{msg}");
+                set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg));
             }
         }
         HcEvent::Unreachable => {
             if *vpn_state != VpnState::ServerUnreachable {
                 dragonfox_vpn::notifications::notify(
-                    "VPN Server Unreachable",
-                    "Cannot reach the VPN gateway.",
+                    &t("notify.unreachable_title"),
+                    &t("notify.unreachable_body"),
                 );
                 set_vpn_unreachable(tray, items, vpn_state, connected_since, status);
                 warn!("VPN server unreachable.");
@@ -797,9 +801,9 @@ fn handle_hc_event(
                 info!("Auto-reconnect: VPN server is back, re-enabling VPN.");
                 set_vpn_enabling(tray, items, vpn_state, status);
                 if do_enable_vpn(adapter, config) {
-                    set_vpn_connected(tray, items, vpn_state, connected_since, status, config, Some("Auto-reconnected after server returned.".to_string()));
+                    set_vpn_connected(tray, items, vpn_state, connected_since, status, config, Some(t("status.auto_reconnected")));
                 } else {
-                    set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some("Auto-reconnect failed.".to_string()));
+                    set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(t("status.auto_reconnect_failed")));
                 }
             }
         }
@@ -879,29 +883,29 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     // label at the top of the menu is the only way to surface state there.
     // On Windows the tooltip works, so the menu label is redundant.
     let status_label = if cfg!(not(target_os = "windows")) {
-        Some(MenuItem::new("Disconnected", false, None))
+        Some(MenuItem::new(&t("tray.disconnected"), false, None))
     } else {
         None
     };
     let sep0 = PredefinedMenuItem::separator();
-    let dashboard = MenuItem::new("Status Dashboard", true, None);
+    let dashboard = MenuItem::new(&t("tray.dashboard"), true, None);
     let sep1 = PredefinedMenuItem::separator();
-    let toggle = MenuItem::new("Enable VPN", setup_complete, None);
+    let toggle = MenuItem::new(&t("tray.enable_vpn"), setup_complete, None);
     let sep2 = PredefinedMenuItem::separator();
-    let location = MenuItem::new("Change Location...", setup_complete, None);
+    let location = MenuItem::new(&t("tray.change_location"), setup_complete, None);
     let autoconnect =
-        CheckMenuItem::new("Auto-Connect on Start", true, config.auto_connect, None);
+        CheckMenuItem::new(&t("tray.autoconnect"), true, config.auto_connect, None);
     let autoreconnect =
-        CheckMenuItem::new("Auto-Reconnect if Server Returns", true, config.auto_reconnect, None);
+        CheckMenuItem::new(&t("tray.autoreconnect"), true, config.auto_reconnect, None);
     let autostart = if cfg!(target_os = "windows") {
-        Some(CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None))
+        Some(CheckMenuItem::new(&t("tray.run_on_startup"), true, AutoStartManager::is_enabled(), None))
     } else {
         None
     };
     let sep3 = PredefinedMenuItem::separator();
-    let settings = MenuItem::new("Settings...", true, None);
+    let settings = MenuItem::new(&t("tray.settings"), true, None);
     let sep4 = PredefinedMenuItem::separator();
-    let exit = MenuItem::new("Exit", true, None);
+    let exit = MenuItem::new(&t("tray.exit"), true, None);
 
     if let Some(ref sl) = status_label {
         let _ = menu.append(sl);
@@ -931,7 +935,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
         .with_icon(initial_icon)
-        .with_tooltip("DragonFoxVPN: Disabled")
+        .with_tooltip(&format!("DragonFoxVPN: {}", t("tray.disconnected")))
         .build()
         .expect("Failed to create tray icon");
 
@@ -962,14 +966,14 @@ fn update_tray_icon(tray: &TrayIcon, items: &MenuItems, vpn_state: &VpnState, lo
         VpnState::Disabled => &COLOR_YELLOW,
     };
     let label = match vpn_state {
-        VpnState::Connected => format!(
-            "Connected - {}",
-            location.unwrap_or("Unknown")
+        VpnState::Connected => t_fmt(
+            "tray.connected_location",
+            &[("location", location.unwrap_or("Unknown"))],
         ),
-        VpnState::Dropped => "Connection Dropped".to_string(),
-        VpnState::ServerUnreachable => "Server Unreachable".to_string(),
-        VpnState::Enabling => "Connecting…".to_string(),
-        VpnState::Disabled => "Disconnected".to_string(),
+        VpnState::Dropped => t("tray.dropped"),
+        VpnState::ServerUnreachable => t("tray.unreachable"),
+        VpnState::Enabling => t("tray.connecting"),
+        VpnState::Disabled => t("tray.disconnected"),
     };
     let rgba = create_status_icon_rgba(color);
     if let Ok(icon) = tray_icon::Icon::from_rgba(rgba, 64, 64) {
