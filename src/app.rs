@@ -559,20 +559,36 @@ impl SettingsWindow {
     fn try_save(&mut self, ctx: &egui::Context) {
         let url = self.switcher_url.trim().trim_end_matches('/').to_string();
 
-        if !self.vpn_gateway.is_valid() || !self.isp_gateway.is_valid() {
-            self.message = Some(t("settings.msg_invalid_ip"));
-            return;
-        }
-        if url.is_empty() || (!url.starts_with("http://") && !url.starts_with("https://")) {
-            self.message = Some(t("settings.msg_invalid_url"));
+        let mut cfg = AppConfig::load();
+        let language_changed = cfg.language.as_deref() != Some(self.language.as_str());
+
+        let ip_valid = self.vpn_gateway.is_valid() && self.isp_gateway.is_valid();
+        let url_valid = !url.is_empty()
+            && (url.starts_with("http://") || url.starts_with("https://"));
+
+        // If network fields are incomplete but the language changed, save just
+        // the language and restart so the user can continue setup in their language.
+        // setup_complete is intentionally left untouched so the setup dialog reappears.
+        if !ip_valid || !url_valid {
+            if language_changed {
+                cfg.language = Some(self.language.clone());
+                cfg.save();
+                write_daemon_command(DaemonCommand::Restart);
+                ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                return;
+            }
+            self.message = Some(if !ip_valid {
+                t("settings.msg_invalid_ip")
+            } else {
+                t("settings.msg_invalid_url")
+            });
+            self.saved = false;
             return;
         }
 
         let vpn_gw = self.vpn_gateway.to_ip_string();
         let isp_gw = self.isp_gateway.to_ip_string();
 
-        let mut cfg = AppConfig::load();
-        let language_changed = cfg.language.as_deref() != Some(self.language.as_str());
         cfg.vpn_gateway = Some(vpn_gw.clone());
         cfg.isp_gateway = Some(isp_gw);
         cfg.dns_server = Some(vpn_gw); // DNS is always the VPN server IP
