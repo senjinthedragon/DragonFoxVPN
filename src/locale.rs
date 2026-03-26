@@ -41,11 +41,37 @@ fn json_for_lang(lang: &str) -> &'static str {
     }
 }
 
+/// Returns the system locale string (e.g. "de_DE.UTF-8" or "zh-CN").
+/// On Linux reads the standard LC_ALL / LANG / LANGUAGE env vars.
+/// On Windows reads LocaleName from HKCU\Control Panel\International via
+/// the winreg crate (already a dependency for dark-mode detection).
+fn system_locale() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        if let Ok(key) = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey("Control Panel\\International")
+        {
+            if let Ok(name) = key.get_value::<String, _>("LocaleName") {
+                return name; // e.g. "de-DE" or "zh-CN"
+            }
+        }
+    }
+    // Linux / macOS: honour the standard locale env vars in priority order.
+    for var in &["LC_ALL", "LC_MESSAGES", "LANG", "LANGUAGE"] {
+        if let Ok(val) = std::env::var(var) {
+            if !val.is_empty() && val != "C" && val != "POSIX" {
+                return val;
+            }
+        }
+    }
+    String::new()
+}
+
 fn detected_language() -> &'static str {
     DETECTED_LANG.get_or_init(|| {
-        let locale = sys_locale::get_locale()
-            .unwrap_or_default()
-            .to_lowercase();
+        let locale = system_locale().to_lowercase();
         if locale.starts_with("zh") {
             "zh_CN".to_string()
         } else if locale.starts_with("ja") {
