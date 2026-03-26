@@ -40,7 +40,6 @@
   "settings.field_router_ip": "IP маршрутизатора",
   "settings.btn_test": "Проверить соединение",
   "settings.btn_save": "Сохранить настройки",
-  "settings.msg_setup_required": "Для использования DragonFoxVPN необходима настройка.",
   "settings.msg_invalid_ip": "IP VPN-сервера и IP маршрутизатора должны быть действительными IPv4-адресами.",
   "settings.msg_invalid_url": "URL переключателя должен начинаться с http:// или https://",
   "settings.msg_saved": "Настройки сохранены.",
@@ -76,6 +75,5 @@
   "location_win.favorites": "Избранное",
   "location_win.switching": "Переключение на {location}…",
   "location_win.switch_failed": "Ошибка: бэкенд всё ещё на {location}",
-  "location_win.switch_error": "Ошибка: {msg}",
-  "settings": {}
+  "location_win.switch_error": "Ошибка: {msg}"
 }

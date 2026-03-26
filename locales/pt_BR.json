@@ -40,7 +40,6 @@
   "settings.field_router_ip": "IP do roteador",
   "settings.btn_test": "Testar conexão",
   "settings.btn_save": "Salvar configurações",
-  "settings.msg_setup_required": "A configuração é necessária para usar o DragonFoxVPN.",
   "settings.msg_invalid_ip": "IP do servidor VPN e IP do roteador devem ser endereços IPv4 válidos.",
   "settings.msg_invalid_url": "A URL do comutador deve começar com http:// ou https://",
   "settings.msg_saved": "Configurações salvas.",
@@ -76,6 +75,5 @@
   "location_win.favorites": "Favoritos",
   "location_win.switching": "Mudando para {location}…",
   "location_win.switch_failed": "Falha: o servidor ainda está em {location}",
-  "location_win.switch_error": "Erro: {msg}",
-  "settings": {}
+  "location_win.switch_error": "Erro: {msg}"
 }

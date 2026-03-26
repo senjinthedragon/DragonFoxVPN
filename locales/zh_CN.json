@@ -40,7 +40,6 @@
   "settings.field_router_ip": "路由器 IP",
   "settings.btn_test": "测试连接",
   "settings.btn_save": "保存设置",
-  "settings.msg_setup_required": "使用 DragonFoxVPN 前需完成初始设置。",
   "settings.msg_invalid_ip": "VPN 服务器 IP 和路由器 IP 必须是有效的 IPv4 地址。",
   "settings.msg_invalid_url": "切换器 URL 必须以 http:// 或 https:// 开头。",
   "settings.msg_saved": "设置已保存。",
@@ -76,6 +75,5 @@
   "location_win.favorites": "收藏",
   "location_win.switching": "正在切换至 {location}…",
   "location_win.switch_failed": "切换失败：后端仍在 {location}",
-  "location_win.switch_error": "错误：{msg}",
-  "settings": {}
+  "location_win.switch_error": "错误：{msg}"
 }

@@ -40,7 +40,6 @@
   "settings.field_router_ip": "라우터 IP",
   "settings.btn_test": "연결 테스트",
   "settings.btn_save": "설정 저장",
-  "settings.msg_setup_required": "DragonFoxVPN을 사용하려면 설정이 필요합니다.",
   "settings.msg_invalid_ip": "VPN 서버 IP와 라우터 IP는 유효한 IPv4 주소여야 합니다.",
   "settings.msg_invalid_url": "스위쳃 URL은 http:// 또는 https://로 시작해야 합니다.",
   "settings.msg_saved": "설정이 저장되었습니다.",
@@ -76,6 +75,5 @@
   "location_win.favorites": "즐겨찾기",
   "location_win.switching": "{location}(으)로 전환 중…",
   "location_win.switch_failed": "전환 실패: 백엔드가 아직 {location}에 있습니다",
-  "location_win.switch_error": "오류: {msg}",
-  "settings": {}
+  "location_win.switch_error": "오류: {msg}"
 }
