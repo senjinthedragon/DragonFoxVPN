@@ -954,6 +954,23 @@ impl IpInput {
 
 /// Run the three connection checks for the Settings "Test Connection" button.
 /// Blocking - intended to be called from a background thread.
+fn simplify_network_error(e: &str) -> String {
+    let lower = e.to_lowercase();
+    if lower.contains("timed out") || lower.contains("10060") || lower.contains("timeout") {
+        "connection timed out".to_string()
+    } else if lower.contains("refused") || lower.contains("10061") {
+        "connection refused".to_string()
+    } else if lower.contains("dns") || lower.contains("resolve") || lower.contains("no such host") {
+        "hostname could not be resolved".to_string()
+    } else if lower.contains("certificate") || lower.contains("ssl") || lower.contains("tls") {
+        "SSL/TLS certificate error".to_string()
+    } else if lower.contains("network") || lower.contains("unreachable") {
+        "network unreachable".to_string()
+    } else {
+        "could not connect".to_string()
+    }
+}
+
 fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(String, bool)> {
     let mut results = Vec::new();
 
@@ -967,7 +984,8 @@ fn run_connection_test(url: String, vpn_ip: String, router_ip: String) -> Vec<(S
                 results.push(("Switcher URL: reached but no locations found - wrong page?".to_string(), false));
             }
             Err(e) => {
-                results.push((format!("Switcher URL: {e}"), false));
+                let msg = simplify_network_error(&e);
+                results.push((format!("Switcher URL: {msg}"), false));
             }
         }
     } else {
