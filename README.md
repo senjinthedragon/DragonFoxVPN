@@ -54,7 +54,7 @@ independently - no router configuration required.
 ### Prerequisites
 
 ```bash
-sudo apt install openvpn apache2 php8.2 libapache2-mod-php8.2
+sudo apt install openvpn apache2 php libapache2-mod-php
 sudo systemctl restart apache2
 ```
 
