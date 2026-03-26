@@ -183,7 +183,7 @@ sudo systemctl reload apache2
 
 Pre-built binaries for Windows and Linux are available on the [GitHub Releases page](https://github.com/senjinthedragon/DragonFoxVPN/releases). Download the binary for your platform and skip straight to the configuration steps below.
 
-- **Windows**: `DragonFoxVPN.exe` — run as Administrator
+- **Windows**: `DragonFoxVPN.exe` — Windows will prompt for administrator rights on launch
 - **Linux**: `DragonFoxVPN` — make it executable (`chmod +x DragonFoxVPN`) and run it normally
 
 If you'd rather build from source, see [Building the Executables Yourself](#building-the-executables-yourself) at the bottom of this file.
@@ -235,7 +235,7 @@ Access **Settings...** from the tray menu at any time to update network configur
 
 ### Windows
 
-Run `DragonFoxVPN.exe` as **Administrator** (required to modify the routing table and network settings).
+Run `DragonFoxVPN.exe` — Windows will automatically prompt for administrator rights (required to modify the routing table).
 
 ### Linux
 
