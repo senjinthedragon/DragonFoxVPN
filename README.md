@@ -2,7 +2,7 @@
 
 A system tray utility for managing VPN connections with a modern dark UI.
 
-Designed to work on **Windows 10/11** and **Linux (Garuda/Arch/Debian)**. Built around a
+Designed to work on **Windows 10/11** and **Linux**. Built around a
 **Raspberry Pi gateway** architecture where a Pi running OpenVPN sits between your LAN and the
 internet, with this tray app managing routing on each client machine.
 
@@ -306,7 +306,7 @@ If you prefer to build from source rather than using a pre-built release binary:
 - **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
 
 ```bash
-# Arch/Garuda
+# Arch-based
 sudo pacman -S libayatana-appindicator
 
 # Debian/Ubuntu
