@@ -487,22 +487,20 @@ impl eframe::App for SettingsWindow {
 
             // ── Language ─────────────────────────────────────────────
             section_header(ui, &t("settings.section_language"));
-            ui.horizontal(|ui| {
-                let current_name = crate::locale::available_languages()
-                    .iter()
-                    .find(|(c, _)| *c == self.language.as_str())
-                    .map(|(_, n)| *n)
-                    .unwrap_or("English");
-                egui::ComboBox::from_id_source("lang_select")
-                    .selected_text(current_name)
-                    .width(200.0)
-                    .show_ui(ui, |ui| {
-                        for (code, name) in crate::locale::available_languages() {
-                            ui.selectable_value(&mut self.language, code.to_string(), *name);
-                        }
-                    });
-                ui.colored_label(egui::Color32::GRAY, t("settings.restart_required"));
-            });
+            let current_name = crate::locale::available_languages()
+                .iter()
+                .find(|(c, _)| *c == self.language.as_str())
+                .map(|(_, n)| *n)
+                .unwrap_or("English");
+            egui::ComboBox::from_id_source("lang_select")
+                .selected_text(current_name)
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    for (code, name) in crate::locale::available_languages() {
+                        ui.selectable_value(&mut self.language, code.to_string(), *name);
+                    }
+                });
+            ui.colored_label(egui::Color32::GRAY, t("settings.restart_required"));
 
             // ── Test results (when available) ─────────────────────────
             if !self.test_results.is_empty() {
@@ -849,20 +847,43 @@ impl eframe::App for LocationWindow {
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        // Heading, search bar, and status always visible at the top.
+        egui::TopBottomPanel::top("loc_top").show(ctx, |ui| {
+            ui.add_space(4.0);
             ui.vertical_centered(|ui| {
                 ui.heading(t("location_win.heading"));
             });
-            ui.add_space(8.0);
-
-            ui.add(
-                egui::TextEdit::singleline(&mut self.search_text)
-                    .hint_text(t("location_win.search_hint")),
-            );
             ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.search_text)
+                        .desired_width(f32::INFINITY)
+                        .hint_text(t("location_win.search_hint")),
+                );
+                if self.is_loading || self.is_switching {
+                    ui.spinner();
+                }
+            });
+            if self.is_switching {
+                ui.label(t_fmt(
+                    "location_win.switching",
+                    &[("location", self.selected_label.as_deref().unwrap_or("…"))],
+                ));
+            } else if let Some(ref msg) = self.switch_status.clone() {
+                let color = if self.switch_ok {
+                    egui::Color32::LIGHT_GREEN
+                } else {
+                    egui::Color32::LIGHT_RED
+                };
+                ui.colored_label(color, msg);
+            }
+            ui.add_space(2.0);
+        });
 
+        // List fills all remaining space.
+        egui::CentralPanel::default().show(ctx, |ui| {
             if self.is_loading {
-                ui.spinner();
+                ui.add_space(12.0);
                 ui.label(t("location_win.loading"));
             } else {
                 let favorites = self.cfg.favorites.clone();
@@ -955,26 +976,6 @@ impl eframe::App for LocationWindow {
                 // Kick off flag fetches for all visible items.
                 for code in visible_iso {
                     self.ensure_flag(&code, ctx);
-                }
-
-                if let Some(ref msg) = self.switch_status.clone() {
-                    let color = if self.switch_ok {
-                        egui::Color32::LIGHT_GREEN
-                    } else {
-                        egui::Color32::LIGHT_RED
-                    };
-                    ui.colored_label(color, msg);
-                }
-
-                if self.is_switching {
-                    ui.add_space(8.0);
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                        ui.label(t_fmt(
-                            "location_win.switching",
-                            &[("location", self.selected_label.as_deref().unwrap_or("…"))],
-                        ));
-                    });
                 }
             }
         });
