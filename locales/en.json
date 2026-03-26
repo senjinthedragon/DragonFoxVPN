@@ -13,9 +13,8 @@
   "tray.connected_location": "Connected - {location}",
   "tray.dropped": "Connection Dropped",
   "tray.unreachable": "Server Unreachable",
-  "tray.connecting": "Connecting\u2026",
-
-  "status.connecting": "Connecting\u2026",
+  "tray.connecting": "Connecting…",
+  "status.connecting": "Connecting…",
   "status.failed": "Failed to enable VPN.",
   "status.vpn_unreachable": "VPN server unreachable.",
   "status.kill_switch": "Kill switch activated - routing cleared.",
@@ -23,7 +22,6 @@
   "status.reconnected": "Reconnected after location switch.",
   "status.auto_reconnected": "Auto-reconnected after server returned.",
   "status.auto_reconnect_failed": "Auto-reconnect failed.",
-
   "notify.location_changed_title": "VPN Location Changed",
   "notify.location_changed_body": "Location changed to {location}.",
   "notify.kill_switch_title": "Kill Switch Activated",
@@ -32,7 +30,6 @@
   "notify.dropped_body": "The VPN route was lost unexpectedly.",
   "notify.unreachable_title": "VPN Server Unreachable",
   "notify.unreachable_body": "Cannot reach the VPN gateway.",
-
   "settings.title_setup": "DragonFoxVPN - Initial Setup",
   "settings.title_settings": "DragonFoxVPN - Settings",
   "settings.heading_setup": "Initial Setup",
@@ -50,7 +47,6 @@
   "settings.section_network": "Network",
   "settings.section_behavior": "Behavior",
   "settings.section_language": "Language",
-
   "test.url_ok": "Switcher URL: {count} locations found",
   "test.url_wrong_page": "Switcher URL: reached but no locations found - wrong page?",
   "test.url_error": "Switcher URL: {msg}",
@@ -61,10 +57,9 @@
   "test.router_not_set": "Router IP: not set",
   "test.reachable": "reachable",
   "test.unreachable": "unreachable",
-
   "status_win.title": "DragonFoxVPN - Status",
   "status_win.state_connected": "CONNECTED",
-  "status_win.state_connecting": "CONNECTING\u2026",
+  "status_win.state_connecting": "CONNECTING…",
   "status_win.state_dropped": "DROPPED",
   "status_win.state_unreachable": "SERVER UNREACHABLE",
   "status_win.state_setup_incomplete": "SETUP INCOMPLETE",
@@ -73,14 +68,14 @@
   "status_win.gateway": "Gateway: {value}",
   "status_win.adapter": "Adapter: {value}",
   "status_win.duration": "Duration: {value}",
-  "status_win.waiting": "Waiting for daemon status\u2026\nIs the tray daemon running?",
-
+  "status_win.waiting": "Waiting for daemon status…\nIs the tray daemon running?",
   "location_win.title": "DragonFoxVPN - Change Location",
   "location_win.heading": "Select VPN Location",
   "location_win.search_hint": "Search countries or cities...",
   "location_win.loading": "Loading locations...",
   "location_win.favorites": "Favorites",
-  "location_win.switching": "Switching to {location}\u2026",
+  "location_win.switching": "Switching to {location}…",
   "location_win.switch_failed": "Switch failed: backend is still on {location}",
-  "location_win.switch_error": "Error: {msg}"
+  "location_win.switch_error": "Error: {msg}",
+  "settings": {}
 }

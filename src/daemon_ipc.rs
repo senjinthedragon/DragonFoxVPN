@@ -46,6 +46,9 @@ pub enum DaemonCommand {
     /// UI changed a setting that requires a full restart (e.g. language).
     /// Daemon spawns a fresh instance of itself then exits.
     Restart,
+    /// User closed the setup window without completing setup.
+    /// Daemon should exit cleanly.
+    Quit,
 }
 
 // --------------------------------------------------------------------------

@@ -399,10 +399,9 @@ impl SettingsWindow {
 
 impl eframe::App for SettingsWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // Block close on first run until setup is saved.
+        // On first run, closing without saving exits the whole application.
         if ctx.input(|i| i.viewport().close_requested()) && self.first_run && !self.saved {
-            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-            self.message = Some(t("settings.msg_setup_required"));
+            write_daemon_command(DaemonCommand::Quit);
         }
 
         // Trigger VPN IP auto-resolve when the switcher URL changes.

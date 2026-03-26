@@ -380,6 +380,10 @@ fn run_tray_daemon() {
                     }
                     std::process::exit(0);
                 }
+                DaemonCommand::Quit => {
+                    info!("Quit requested by setup subprocess.");
+                    std::process::exit(0);
+                }
                 DaemonCommand::Reconnect => {
                     info!("Reconnect requested by UI subprocess.");
                     if vpn_state == VpnState::Connected {
