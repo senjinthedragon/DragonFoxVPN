@@ -28,7 +28,7 @@ jobs:
           restore-keys: windows-cargo-
 
       - name: Build release
-        run: cargo build --release --features windows-resources
+        run: cargo build --release
 
       - name: Upload to release
         uses: softprops/action-gh-release@v2.3.2

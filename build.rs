@@ -10,7 +10,7 @@
 fn main() {
     #[cfg(target_os = "windows")]
     {
-        if std::env::var("CARGO_FEATURE_WINDOWS_RESOURCES").is_ok() {
+        {
             let mut res = winresource::WindowsResource::new();
             res.set("FileVersion", "2.0.0.0");
             res.set("ProductVersion", "2.0.0.0");
