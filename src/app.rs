@@ -118,6 +118,7 @@ fn run_native_with_fallback(
     options: eframe::NativeOptions,
     make_app: impl Fn() -> Box<dyn eframe::App> + 'static,
 ) {
+    let visuals = platform_visuals();
     let make_app = std::sync::Arc::new(std::sync::Mutex::new(Some(make_app)));
 
     // Explicitly try glow (OpenGL) first - lighter weight and more widely
@@ -126,10 +127,14 @@ fn run_native_with_fallback(
     glow_options.renderer = eframe::Renderer::Glow;
 
     let make_app_clone = make_app.clone();
+    let visuals_clone = visuals.clone();
     let result = eframe::run_native(
         title,
         glow_options,
-        Box::new(move |_cc| Ok(make_app_clone.lock().unwrap().take().unwrap()())),
+        Box::new(move |cc| {
+            cc.egui_ctx.set_visuals(visuals_clone);
+            Ok(make_app_clone.lock().unwrap().take().unwrap()())
+        }),
     );
 
     if let Err(e) = result {
@@ -139,11 +144,102 @@ fn run_native_with_fallback(
         if let Err(e2) = eframe::run_native(
             title,
             wgpu_options,
-            Box::new(move |_cc| Ok(make_app.lock().unwrap().take().unwrap()())),
+            Box::new(move |cc| {
+                cc.egui_ctx.set_visuals(visuals);
+                Ok(make_app.lock().unwrap().take().unwrap()())
+            }),
         ) {
             log::error!("wgpu renderer also failed: {e2}");
         }
     }
+}
+
+// --------------------------------------------------------------------------
+// Platform theming
+// --------------------------------------------------------------------------
+
+/// Returns egui visuals appropriate for the current platform and system theme.
+/// On Windows, reads the dark/light mode preference from the registry and
+/// applies Windows 11-style colors and rounding. On other platforms returns
+/// the default dark theme.
+fn platform_visuals() -> egui::Visuals {
+    #[cfg(target_os = "windows")]
+    {
+        if windows_is_dark_mode() {
+            windows_dark_visuals()
+        } else {
+            windows_light_visuals()
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        egui::Visuals::dark()
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn windows_is_dark_mode() -> bool {
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize")
+        .and_then(|k| k.get_value::<u32, _>("AppsUseLightTheme"))
+        .map(|v: u32| v == 0)
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "windows")]
+fn windows_dark_visuals() -> egui::Visuals {
+    use egui::{Color32, Rounding, Stroke, Visuals};
+    let accent = Color32::from_rgb(0, 120, 212); // #0078D4 Windows blue
+    let mut v = Visuals::dark();
+    v.window_rounding        = Rounding::same(8.0);
+    v.window_fill            = Color32::from_rgb(32, 32, 32);
+    v.panel_fill             = Color32::from_rgb(45, 45, 45);
+    v.window_stroke          = Stroke::new(1.0, Color32::from_rgb(60, 60, 60));
+    v.selection.bg_fill      = accent;
+    v.selection.stroke       = Stroke::new(1.0, Color32::WHITE);
+    v.hyperlink_color        = Color32::from_rgb(77, 166, 255);
+    let r = Rounding::same(4.0);
+    v.widgets.noninteractive.rounding   = r;
+    v.widgets.inactive.rounding         = r;
+    v.widgets.inactive.weak_bg_fill     = Color32::from_rgb(62, 62, 62);
+    v.widgets.inactive.bg_fill          = Color32::from_rgb(62, 62, 62);
+    v.widgets.hovered.rounding          = r;
+    v.widgets.hovered.weak_bg_fill      = Color32::from_rgb(75, 75, 75);
+    v.widgets.hovered.bg_fill           = Color32::from_rgb(75, 75, 75);
+    v.widgets.active.rounding           = r;
+    v.widgets.active.weak_bg_fill       = Color32::from_rgb(90, 90, 90);
+    v.widgets.active.bg_fill            = Color32::from_rgb(90, 90, 90);
+    v.widgets.open.rounding             = r;
+    v
+}
+
+#[cfg(target_os = "windows")]
+fn windows_light_visuals() -> egui::Visuals {
+    use egui::{Color32, Rounding, Stroke, Visuals};
+    let accent = Color32::from_rgb(0, 120, 212);
+    let mut v = Visuals::light();
+    v.window_rounding        = Rounding::same(8.0);
+    v.window_fill            = Color32::from_rgb(243, 243, 243);
+    v.panel_fill             = Color32::from_rgb(255, 255, 255);
+    v.window_stroke          = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
+    v.selection.bg_fill      = accent;
+    v.selection.stroke       = Stroke::new(1.0, Color32::WHITE);
+    v.hyperlink_color        = accent;
+    let r = Rounding::same(4.0);
+    v.widgets.noninteractive.rounding   = r;
+    v.widgets.inactive.rounding         = r;
+    v.widgets.inactive.weak_bg_fill     = Color32::from_rgb(230, 230, 230);
+    v.widgets.inactive.bg_fill          = Color32::from_rgb(230, 230, 230);
+    v.widgets.hovered.rounding          = r;
+    v.widgets.hovered.weak_bg_fill      = Color32::from_rgb(214, 214, 214);
+    v.widgets.hovered.bg_fill           = Color32::from_rgb(214, 214, 214);
+    v.widgets.active.rounding           = r;
+    v.widgets.active.weak_bg_fill       = Color32::from_rgb(200, 200, 200);
+    v.widgets.active.bg_fill            = Color32::from_rgb(200, 200, 200);
+    v.widgets.open.rounding             = r;
+    v
 }
 
 // --------------------------------------------------------------------------
@@ -167,7 +263,7 @@ pub fn run_settings_window() {
             } else {
                 "DragonFoxVPN - Settings"
             })
-            .with_inner_size([500.0, 360.0])
+            .with_inner_size([460.0, 500.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -189,7 +285,7 @@ pub fn run_status_window() {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("DragonFoxVPN - Status")
-            .with_inner_size([420.0, 300.0])
+            .with_inner_size([380.0, 500.0])
             .with_resizable(false),
         ..Default::default()
     };
@@ -242,6 +338,7 @@ struct SettingsWindow {
     testing: bool,
     test_rx: Option<std::sync::mpsc::Receiver<Vec<(String, bool)>>>,
     test_results: Vec<(String, bool)>,
+    last_height: f32,
 }
 
 impl SettingsWindow {
@@ -260,14 +357,13 @@ impl SettingsWindow {
             testing: false,
             test_rx: None,
             test_results: Vec::new(),
+            last_height: 0.0,
         }
     }
 }
 
 impl eframe::App for SettingsWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_visuals(egui::Visuals::dark());
-
         // Block close on first run until setup is saved.
         if ctx.input(|i| i.viewport().close_requested()) && self.first_run && !self.saved {
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
@@ -313,7 +409,7 @@ impl eframe::App for SettingsWindow {
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let panel = egui::TopBottomPanel::top("settings_content").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.heading(if self.first_run {
                     "Initial Setup"
@@ -391,6 +487,12 @@ impl eframe::App for SettingsWindow {
                 });
             });
         });
+        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |_| {});
+        let h = panel.response.rect.height();
+        if (h - self.last_height).abs() > 1.0 {
+            self.last_height = h;
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(460.0, h)));
+        }
     }
 }
 
@@ -451,19 +553,19 @@ impl SettingsWindow {
 // Status window
 // --------------------------------------------------------------------------
 
-struct StatusWindow;
+struct StatusWindow {
+    last_height: f32,
+}
 
 impl StatusWindow {
     fn new() -> Self {
-        Self
+        Self { last_height: 0.0 }
     }
 }
 
 impl eframe::App for StatusWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_visuals(egui::Visuals::dark());
-
-        egui::CentralPanel::default().show(ctx, |ui| {
+        let panel = egui::TopBottomPanel::top("status_content").show(ctx, |ui| {
             ui.vertical_centered(|ui| {
                 ui.colored_label(
                     egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
@@ -529,6 +631,12 @@ impl eframe::App for StatusWindow {
 
             ui.add_space(8.0);
         });
+        egui::CentralPanel::default().frame(egui::Frame::none()).show(ctx, |_| {});
+        let h = panel.response.rect.height();
+        if (h - self.last_height).abs() > 1.0 {
+            self.last_height = h;
+            ctx.send_viewport_cmd(egui::ViewportCommand::InnerSize(egui::vec2(380.0, h)));
+        }
 
         // Refresh once per second so the duration counter updates.
         ctx.request_repaint_after(Duration::from_secs(1));
@@ -638,8 +746,6 @@ impl LocationWindow {
 
 impl eframe::App for LocationWindow {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_visuals(egui::Visuals::dark());
-
         // Drain background messages.
         while let Ok(msg) = self.msg_rx.try_recv() {
             match msg {

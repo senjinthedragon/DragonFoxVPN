@@ -468,10 +468,16 @@ fn set_vpn_connected(
     items.toggle.set_enabled(true);
     status.state = "Connected".to_string();
     status.connected_since_unix = Some(current_unix_ts());
-    status.location = config
-        .last_location
-        .clone()
-        .unwrap_or_else(|| "Unknown".to_string());
+    // Prefer saved config location; fall back to whatever was fetched at
+    // startup (status.location) before defaulting to "Unknown".
+    let existing = status.location.clone();
+    status.location = config.last_location.clone().unwrap_or_else(|| {
+        if !existing.is_empty() && existing != "Unknown" {
+            existing
+        } else {
+            "Unknown".to_string()
+        }
+    });
     status.message = message;
     update_tray_icon(tray, items, vpn_state, Some(&status.location));
     save_daemon_status(status);
@@ -828,7 +834,7 @@ fn handle_menu_event(
 // --------------------------------------------------------------------------
 
 struct MenuItems {
-    status_label: MenuItem,
+    status_label: Option<MenuItem>, // Linux only; Windows uses the tray tooltip instead
     dashboard: MenuItem,
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
@@ -843,7 +849,14 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let menu = Menu::new();
 
     let setup_complete = config.setup_complete;
-    let status_label = MenuItem::new("Disconnected", false, None);
+    // On Linux, libappindicator doesn't show tray tooltips, so a status
+    // label at the top of the menu is the only way to surface state there.
+    // On Windows the tooltip works, so the menu label is redundant.
+    let status_label = if cfg!(not(target_os = "windows")) {
+        Some(MenuItem::new("Disconnected", false, None))
+    } else {
+        None
+    };
     let sep0 = PredefinedMenuItem::separator();
     let dashboard = MenuItem::new("Status Dashboard", true, None);
     let sep1 = PredefinedMenuItem::separator();
@@ -864,8 +877,10 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let sep4 = PredefinedMenuItem::separator();
     let exit = MenuItem::new("Exit", true, None);
 
-    let _ = menu.append(&status_label);
-    let _ = menu.append(&sep0);
+    if let Some(ref sl) = status_label {
+        let _ = menu.append(sl);
+        let _ = menu.append(&sep0);
+    }
     let _ = menu.append(&dashboard);
     let _ = menu.append(&sep1);
     let _ = menu.append(&toggle);
@@ -935,5 +950,7 @@ fn update_tray_icon(tray: &TrayIcon, items: &MenuItems, vpn_state: &VpnState, lo
         let _ = tray.set_icon(Some(icon));
     }
     let _ = tray.set_tooltip(Some(&label));
-    items.status_label.set_text(&label);
+    if let Some(ref sl) = items.status_label {
+        sl.set_text(&label);
+    }
 }
