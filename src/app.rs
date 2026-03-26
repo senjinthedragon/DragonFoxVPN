@@ -574,6 +574,7 @@ impl SettingsWindow {
                 cfg.language = Some(self.language.clone());
                 cfg.save();
                 write_daemon_command(DaemonCommand::Restart);
+                self.saved = true; // prevent close handler from blocking the restart
                 ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                 return;
             }
