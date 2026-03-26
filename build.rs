@@ -12,8 +12,8 @@ fn main() {
     {
         if std::env::var("CARGO_FEATURE_WINDOWS_RESOURCES").is_ok() {
             let mut res = winresource::WindowsResource::new();
-            res.set("FileVersion", "1.1.0.0");
-            res.set("ProductVersion", "1.1.0.0");
+            res.set("FileVersion", "2.0.0.0");
+            res.set("ProductVersion", "2.0.0.0");
             res.set("ProductName", "DragonFoxVPN");
             res.set("FileDescription", "DragonFoxVPN System Tray Application");
             res.set("LegalCopyright", "Copyright (c) 2026 Senjin the Dragon");
