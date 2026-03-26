@@ -38,17 +38,20 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      - name: Package
+        run: Compress-Archive -Path target/release/DragonFoxVPN.exe -DestinationPath DragonFoxVPN-windows.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: DragonFoxVPN-windows
-          path: target/release/DragonFoxVPN.exe
+          path: DragonFoxVPN-windows.zip
 
       - name: Upload to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2.3.2
         with:
-          files: target/release/DragonFoxVPN.exe
+          files: DragonFoxVPN-windows.zip
 
   build-linux:
     runs-on: ubuntu-latest
@@ -81,14 +84,17 @@ jobs:
       - name: Build release
         run: cargo build --release
 
+      - name: Package
+        run: tar -czf DragonFoxVPN-linux.tar.gz -C target/release DragonFoxVPN
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: DragonFoxVPN-linux
-          path: target/release/DragonFoxVPN
+          path: DragonFoxVPN-linux.tar.gz
 
       - name: Upload to release
         if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2.3.2
         with:
-          files: target/release/DragonFoxVPN
+          files: DragonFoxVPN-linux.tar.gz
