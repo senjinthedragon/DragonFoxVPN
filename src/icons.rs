@@ -49,6 +49,8 @@ pub fn create_status_icon_rgba(color: &IconColor) -> Vec<u8> {
             if dist <= RADIUS - BORDER {
                 // Interior: apply a simple radial gradient (lighter toward top-left)
                 let t = 1.0 - (dist / (RADIUS - BORDER)).powi(2);
+                // Specular highlight centred at (-8, -12) — top-left of the circle.
+                // Falloff radius 22 px; brightness boost capped at 35%.
                 let shine_dist = ((fx - (-8.0)).powi(2) + (fy - (-12.0)).powi(2)).sqrt();
                 let shine = ((1.0 - (shine_dist / 22.0).min(1.0)) * 0.35).max(0.0);
 

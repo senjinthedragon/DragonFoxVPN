@@ -140,6 +140,8 @@ impl VpnApi {
 
 /// Add a trailing slash if the URL has no path component so Apache doesn't
 /// issue a 301 that ureq would follow as a GET.
+/// A bare `http://host` has 2 slashes (the scheme `://`); 3+ means a path
+/// is already present (e.g. `http://host/`).
 pub fn ensure_trailing_slash(url: &str) -> String {
     if url.matches('/').count() < 3 {
         format!("{}/", url.trim_end_matches('/'))

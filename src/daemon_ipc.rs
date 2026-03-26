@@ -12,6 +12,7 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Cap the command queue so a slow-consuming daemon can't accumulate an unbounded backlog.
 const MAX_COMMAND_QUEUE: usize = 32;
 
 // --------------------------------------------------------------------------
@@ -96,6 +97,8 @@ pub fn take_daemon_command() -> Option<DaemonCommand> {
     }
     let cmd = queue.remove(0);
     if queue.is_empty() {
+        // Delete the file rather than writing an empty array so the daemon's
+        // existence-check polling stays cheap (stat vs. read+parse).
         let _ = std::fs::remove_file(&path);
     } else if let Ok(json) = serde_json::to_string(&queue) {
         write_atomic(path, &json);

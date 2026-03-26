@@ -145,6 +145,7 @@ impl SystemHandler {
                     }
                 }
             }
+            // eno1 is common on Ethernet-first desktops but is still a guess.
             "eno1".to_string()
         }
     }
@@ -301,7 +302,9 @@ impl SystemHandler {
     }
 }
 
-/// Extract all IPv4 addresses from a string.
+/// Extract all IPv4 addresses from a string, in order of appearance.
+/// Uses a manual byte-level scanner rather than regex to avoid pulling in
+/// the `regex` crate (SimpleRegex only handles character-class patterns).
 pub fn extract_ips(text: &str) -> Vec<String> {
     let mut ips = Vec::new();
     let bytes = text.as_bytes();
@@ -351,6 +354,8 @@ impl SimpleRegex {
                     c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == ':' || c == '-'
                 })
         } else {
+            // Only the one pattern above is used in this codebase. Any other
+            // pattern passed here would be a programming error, so fail closed.
             false
         }
     }

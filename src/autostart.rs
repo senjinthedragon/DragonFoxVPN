@@ -37,7 +37,7 @@ impl AutoStartManager {
             Ok(reg_path) => {
                 let reg_path = reg_path.trim_matches('"').trim_matches('\'').to_string();
                 let exe = std::env::current_exe().unwrap_or_default();
-                // Normalize comparison
+                // Windows paths are case-insensitive, so lowercase both sides.
                 let p1 = reg_path.to_lowercase();
                 let p2 = exe.to_string_lossy().to_lowercase();
                 p1 == p2

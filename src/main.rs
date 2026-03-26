@@ -52,12 +52,14 @@ fn vpn_active_lock() -> &'static std::sync::Mutex<Option<(String, String)>> {
     VPN_ACTIVE.get_or_init(|| std::sync::Mutex::new(None))
 }
 
+/// Called when the VPN route goes active so signal/panic handlers know what to tear down.
 fn set_vpn_active(adapter: &str, vpn_gateway: &str) {
     if let Ok(mut g) = vpn_active_lock().lock() {
         *g = Some((adapter.to_string(), vpn_gateway.to_string()));
     }
 }
 
+/// Called when the VPN route is removed so handlers know there is nothing to tear down.
 fn clear_vpn_active() {
     if let Ok(mut g) = vpn_active_lock().lock() {
         *g = None;
@@ -273,6 +275,8 @@ fn run_tray_daemon() {
         // libappindicator on Linux always shows a menu on right-click and
         // cannot suppress it, so set_menu(None) has no effect - swapping to a
         // disabled placeholder is the only reliable way to block interaction.
+        // The change is edge-triggered (open != was_open) so set_enabled is
+        // only called once per transition, not every loop iteration.
         let dialog_open = any_ui_open();
         if dialog_open != dialog_was_open {
             if dialog_open {
@@ -493,6 +497,7 @@ fn set_vpn_connected(
     save_daemon_status(status);
 }
 
+/// Called on an explicit user-initiated disable (or clean startup disable). No error message.
 fn set_vpn_disabled(
     tray: &TrayIcon,
     items: &MenuItems,
@@ -512,6 +517,7 @@ fn set_vpn_disabled(
     save_daemon_status(status);
 }
 
+/// Called when enable_vpn returns false — routing never came up. Sets a failure message.
 fn set_vpn_failed(
     tray: &TrayIcon,
     items: &MenuItems,
@@ -634,12 +640,19 @@ fn spawn_ui(mode: &str) {
 // Health-check background thread
 // --------------------------------------------------------------------------
 
+/// Events sent from the health-check background thread to the main loop.
 enum HcEvent {
+    /// VPN route disappeared. `kill_switched` = true if we force-deleted it ourselves.
     Dropped { kill_switched: bool },
+    /// Pi is not responding to pings; tunnel state is unknown.
     Unreachable,
+    /// Was Dropped/Unreachable but health checks now pass again.
     Recovered,
+    /// Still connected and healthy — sent every check cycle while connected.
     Healthy,
+    /// Location label fetched from the backend (startup sync or 5-min refresh).
     LocationFetched(String),
+    /// Pi is reachable but the VPN route is gone and auto_reconnect is enabled.
     AutoReconnect,
 }
 
@@ -704,6 +717,9 @@ fn health_check_loop(
             }
         } else if !result.vpn_active && result.route_exists {
             drop_count += 1;
+            // Require two consecutive failures before firing the kill switch.
+            // One bad check could be a transient blip; two gives a single-retry
+            // grace period before we cut traffic.
             if drop_count >= 2 {
                 warn!("VPN dropped after {drop_count} checks - triggering kill switch.");
                 SystemHandler::kill_switch_delete_route(&vpn_gw, &adapter);
