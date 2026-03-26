@@ -17,10 +17,10 @@ internet, with this tray app managing routing on each client machine.
   - Favorites system
 - **Smart Automation** (configured in Settings):
   - **Auto-Connect**: Connects to the last used location on app launch.
-  - **Auto-Reconnect**: Optionally re-enables the VPN automatically when the server comes back online after a drop. Disabled by default — see the security note below.
+  - **Auto-Reconnect**: Optionally re-enables the VPN automatically when the server comes back online after a drop. Disabled by default - see the security note below.
   - **Run on Startup**: (Windows) Option to launch automatically on system login.
 - **Security & Safety**:
-  - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly. When the VPN drops, the route is immediately removed and all traffic stops until you manually re-enable it — or until the server returns if Auto-Reconnect is enabled.
+  - **Kill Switch**: Blocks internet access if the VPN connection drops unexpectedly. When the VPN drops, the route is immediately removed and all traffic stops until you manually re-enable it - or until the server returns if Auto-Reconnect is enabled.
   - **Drop Debouncing**: Requires two consecutive failed checks before triggering the kill switch, avoiding false positives.
   - **DNS Leak Protection**: Automatically flushes DNS caches and enforces VPN DNS.
 - **Real-time Monitoring**:
@@ -31,7 +31,7 @@ internet, with this tray app managing routing on each client machine.
 
 ## Security Note: Kill Switch and Auto-Reconnect
 
-By default, when the VPN drops the kill switch removes the routing rule and **all internet traffic stops** until you manually click "Enable VPN". This is intentional — it ensures no unprotected traffic ever leaves your machine without your explicit action.
+By default, when the VPN drops the kill switch removes the routing rule and **all internet traffic stops** until you manually click "Enable VPN". This is intentional - it ensures no unprotected traffic ever leaves your machine without your explicit action.
 
 The **Auto-Reconnect** option (in the Settings window under Behavior) will automatically re-enable the VPN when the server comes back online. This is convenient for situations like a scheduled Pi reboot, but it comes with a trade-off: you are trusting that the reconnection will succeed and that no traffic slips through in the window between the kill switch firing and the VPN being restored. If you use the VPN for strict privacy or to protect sensitive downloads, leave Auto-Reconnect **off** and reconnect manually.
 
@@ -45,7 +45,7 @@ The **Auto-Reconnect** option (in the Settings window under Behavior) will autom
 The tray app modifies the **client machine's** routing table to send all traffic through the Pi.
 The Pi runs OpenVPN and a small PHP web UI (`backend/`) that the tray app queries to fetch
 available locations and trigger server switches. Each client machine runs the tray app
-independently — no router configuration required.
+independently - no router configuration required.
 
 ---
 
@@ -72,8 +72,8 @@ The file is well-commented. The values you'll need to change are:
 
 | Setting       | How to find it                                                                  |
 | ------------- | ------------------------------------------------------------------------------- |
-| `LAN_IF`      | Run `ip link` — it's the interface with your LAN IP (usually `eth0`)            |
-| `LAN_NET`     | Your router's subnet, e.g. `192.168.1.0/24` — check your router's DHCP settings |
+| `LAN_IF`      | Run `ip link` - it's the interface with your LAN IP (usually `eth0`)            |
+| `LAN_NET`     | Your router's subnet, e.g. `192.168.1.0/24` - check your router's DHCP settings |
 | `PI_IP`       | The Pi's own LAN IP address                                                     |
 | `CONF_PREFIX` | The common prefix of your `.ovpn` filenames, e.g. `my_expressvpn_`              |
 
@@ -95,7 +95,7 @@ sudo cp *.ovpn /etc/openvpn/client/configs/
 
 > **ExpressVPN users**: Log into your account → Downloads → Manual Config → OpenVPN.
 > Download the configs for the locations you want and copy them to the Pi.
-> Each user must download their own — the files contain account-specific credentials.
+> Each user must download their own - the files contain account-specific credentials.
 
 ### 4. Set up the routing script
 
@@ -124,7 +124,7 @@ sudo chmod 600 /etc/openvpn/client/credentials.txt
 
 > **Providers with embedded credentials**: Some providers include credentials directly inside
 > the `.ovpn` files rather than using a separate auth file. If yours does, comment out the
-> `auth-user-pass` line in `common.conf` — otherwise OpenVPN will fail to start.
+> `auth-user-pass` line in `common.conf` - otherwise OpenVPN will fail to start.
 
 ### 6. Install and enable the switch script
 
@@ -161,8 +161,8 @@ sudo cp backend/apache-vhost.conf.example /etc/apache2/sites-available/vpn.conf
 
 Open the file and edit two lines to match your setup:
 
-- `ServerName` — the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
-- `Require ip` — your LAN subnet (e.g. `192.168.1.0/24`)
+- `ServerName` - the hostname or IP you'll use to reach the Pi (e.g. `vpn.local` or `10.0.0.20`)
+- `Require ip` - your LAN subnet (e.g. `192.168.1.0/24`)
 
 ```bash
 sudo a2ensite vpn
@@ -175,7 +175,7 @@ sudo systemctl reload apache2
 
 ### Prerequisites
 
-- **Rust stable toolchain** — install via [rustup.rs](https://rustup.rs)
+- **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
 - **Windows**: MSVC build tools (Visual Studio Build Tools or Visual Studio with the C++ workload)
 - **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
 
@@ -229,15 +229,15 @@ Then run the app normally (no sudo):
 
 On first launch the app shows a setup dialog. Here's what each field means:
 
-| Field                | What to enter                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------- |
+| Field                | What to enter                                                                                    |
+| -------------------- | ------------------------------------------------------------------------------------------------ |
 | **VPN Switcher URL** | `http://` or `https://` followed by your Pi's IP or hostname, e.g. `http://10.0.0.20`            |
 | **VPN Server IP**    | Your Pi's LAN IP address (the same IP you SSH into it with). Auto-filled when you enter the URL. |
-| **Router IP**        | Your router's LAN IP — usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
+| **Router IP**        | Your router's LAN IP - usually `192.168.1.1` or `10.0.0.1`; check via `ip route \| grep default` |
 
 The **VPN Server IP** field is automatically populated via DNS lookup when you enter a valid Switcher URL. You can override it manually if needed.
 
-Use the **Test Connection** button to verify all three values before saving — it checks that the switcher page is reachable and returns locations, and that both IPs respond to pings.
+Use the **Test Connection** button to verify all three values before saving - it checks that the switcher page is reachable and returns locations, and that both IPs respond to pings.
 
 ### Settings
 
@@ -295,7 +295,7 @@ Flag icons are cached locally in a `flags` subdirectory alongside the config fil
 
 ### Tray shows "Server Unreachable"
 
-- The Pi is not responding to pings from the client — check they are on the same LAN
+- The Pi is not responding to pings from the client - check they are on the same LAN
 - Confirm the VPN Gateway IP in Settings matches the Pi's actual LAN IP
 
 ### Kill switch triggers unexpectedly
@@ -313,6 +313,6 @@ Flag icons are cached locally in a `flags` subdirectory alongside the config fil
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License - see [LICENSE](LICENSE) for details.
 
 Bundled dependency: [flag-icons](https://github.com/lipis/flag-icons) by Panayiotis Lipiridis (MIT).
