@@ -1,6 +1,6 @@
 [package]
 name = "dragonfox-vpn"
-version = "1.1.0"
+version = "2.0.0"
 edition = "2021"
 description = "DragonFoxVPN - System tray VPN management application"
 authors = ["Senjin the Dragon"]
