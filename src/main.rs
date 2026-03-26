@@ -242,6 +242,7 @@ fn run_tray_daemon() {
                 items.toggle.set_enabled(false);
                 items.location.set_enabled(false);
                 items.autoconnect.set_enabled(false);
+                items.autoreconnect.set_enabled(false);
                 if let Some(ref a) = items.autostart { a.set_enabled(false); }
                 items.settings.set_enabled(false);
                 items.exit.set_enabled(false);
@@ -251,6 +252,7 @@ fn run_tray_daemon() {
                 items.settings.set_enabled(true);
                 items.exit.set_enabled(true);
                 items.autoconnect.set_enabled(true);
+                items.autoreconnect.set_enabled(true);
                 if let Some(ref a) = items.autostart { a.set_enabled(true); }
                 let setup_done = config.setup_complete;
                 items.toggle.set_text(if vpn_state == VpnState::Connected {
@@ -581,6 +583,7 @@ enum HcEvent {
     Recovered,
     Healthy,
     LocationFetched(String),
+    AutoReconnect,
 }
 
 fn health_check_loop(
@@ -633,7 +636,12 @@ fn health_check_loop(
         } else if !result.route_exists {
             drop_count = 0;
             if result.pi_reachable {
-                let _ = tx.send(HcEvent::Dropped { kill_switched: false });
+                let config = AppConfig::load();
+                if config.auto_reconnect {
+                    let _ = tx.send(HcEvent::AutoReconnect);
+                } else {
+                    let _ = tx.send(HcEvent::Dropped { kill_switched: false });
+                }
             } else {
                 let _ = tx.send(HcEvent::Unreachable);
             }
@@ -645,8 +653,8 @@ fn handle_hc_event(
     ev: HcEvent,
     tray: &TrayIcon,
     items: &MenuItems,
-    _adapter: &str,
-    _config: &AppConfig,
+    adapter: &str,
+    config: &AppConfig,
     vpn_state: &mut VpnState,
     connected_since: &mut Option<Instant>,
     status: &mut DaemonStatus,
@@ -675,18 +683,31 @@ fn handle_hc_event(
             }
         }
         HcEvent::Dropped { kill_switched } => {
-            let msg = if kill_switched {
-                "Kill switch activated - routing cleared."
-            } else {
-                "VPN route lost unexpectedly."
-            };
-            set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg.to_string()));
-            error!("{msg}");
+            if *vpn_state != VpnState::Dropped {
+                let msg = if kill_switched {
+                    "Kill switch activated - routing cleared."
+                } else {
+                    "VPN route lost unexpectedly."
+                };
+                set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some(msg.to_string()));
+                error!("{msg}");
+            }
         }
         HcEvent::Unreachable => {
             if *vpn_state != VpnState::ServerUnreachable {
                 set_vpn_unreachable(tray, items, vpn_state, connected_since, status);
                 warn!("VPN server unreachable.");
+            }
+        }
+        HcEvent::AutoReconnect => {
+            if matches!(*vpn_state, VpnState::Dropped | VpnState::ServerUnreachable) {
+                info!("Auto-reconnect: VPN server is back, re-enabling VPN.");
+                set_vpn_enabling(tray, items, vpn_state, status);
+                if do_enable_vpn(adapter, config) {
+                    set_vpn_connected(tray, items, vpn_state, connected_since, status, config, Some("Auto-reconnected after server returned.".to_string()));
+                } else {
+                    set_vpn_dropped(tray, items, vpn_state, connected_since, status, Some("Auto-reconnect failed.".to_string()));
+                }
             }
         }
     }
@@ -728,6 +749,10 @@ fn handle_menu_event(
         let mut cfg = AppConfig::load();
         cfg.auto_connect = items.autoconnect.is_checked();
         cfg.save();
+    } else if id == items.autoreconnect.id() {
+        let mut cfg = AppConfig::load();
+        cfg.auto_reconnect = items.autoreconnect.is_checked();
+        cfg.save();
     } else if items.autostart.as_ref().is_some_and(|a| id == *a.id()) {
         AutoStartManager::set_autostart(items.autostart.as_ref().unwrap().is_checked());
     } else if id == items.settings.id() {
@@ -746,6 +771,7 @@ struct MenuItems {
     toggle: MenuItem, // "Enable VPN" or "Disable VPN" depending on state
     location: MenuItem,
     autoconnect: CheckMenuItem,
+    autoreconnect: CheckMenuItem,
     autostart: Option<CheckMenuItem>, // Windows only; None on Linux/macOS
     settings: MenuItem,
     exit: MenuItem,
@@ -762,6 +788,8 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let location = MenuItem::new("Change Location...", setup_complete, None);
     let autoconnect =
         CheckMenuItem::new("Auto-Connect on Start", true, config.auto_connect, None);
+    let autoreconnect =
+        CheckMenuItem::new("Auto-Reconnect if Server Returns", true, config.auto_reconnect, None);
     let autostart = if cfg!(target_os = "windows") {
         let item = CheckMenuItem::new("Run on Startup", true, AutoStartManager::is_enabled(), None);
         let _ = menu.append(&item);
@@ -780,6 +808,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
     let _ = menu.append(&sep2);
     let _ = menu.append(&location);
     let _ = menu.append(&autoconnect);
+    let _ = menu.append(&autoreconnect);
     let _ = menu.append(&sep3);
     let _ = menu.append(&settings);
     let _ = menu.append(&sep4);
@@ -803,6 +832,7 @@ fn build_tray(config: &AppConfig) -> (TrayIcon, MenuItems) {
         toggle,
         location,
         autoconnect,
+        autoreconnect,
         autostart,
         settings,
         exit,

@@ -56,6 +56,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub auto_connect: bool,
     #[serde(default)]
+    pub auto_reconnect: bool,
+    #[serde(default)]
     pub last_location: Option<String>,
     #[serde(default)]
     pub vpn_gateway: Option<String>,
@@ -74,6 +76,7 @@ impl Default for AppConfig {
         Self {
             favorites: Vec::new(),
             auto_connect: false,
+            auto_reconnect: false,
             last_location: None,
             vpn_gateway: None,
             isp_gateway: None,

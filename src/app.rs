@@ -42,34 +42,68 @@ fn acquire_ui_lock(mode: &str) -> Option<UiLock> {
         .unwrap_or_else(|| std::path::Path::new("."))
         .join(format!("ui_{mode}.lock"));
 
-    if std::fs::OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&path)
-        .is_ok()
-    {
+    // Helper: try to create the lock file, writing our PID into it.
+    let try_create = |p: &std::path::PathBuf| -> bool {
+        use std::io::Write;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(p)
+        {
+            let _ = write!(f, "{}", std::process::id());
+            true
+        } else {
+            false
+        }
+    };
+
+    if try_create(&path) {
         return Some(UiLock { path });
     }
 
-    // Clear stale lock files left by crashed processes (older than 6 hours).
-    let stale = Duration::from_secs(6 * 60 * 60);
-    if let Ok(meta) = std::fs::metadata(&path) {
-        if let Ok(modified) = meta.modified() {
-            if modified.elapsed().unwrap_or_default() > stale {
-                let _ = std::fs::remove_file(&path);
-                if std::fs::OpenOptions::new()
-                    .create_new(true)
-                    .write(true)
-                    .open(&path)
-                    .is_ok()
-                {
-                    return Some(UiLock { path });
-                }
-            }
+    // Read the PID from the existing lock file and check if that process is
+    // still running. If the process is gone, the lock is stale.
+    let stale = if let Ok(contents) = std::fs::read_to_string(&path) {
+        if let Ok(pid) = contents.trim().parse::<u32>() {
+            !pid_is_running(pid)
+        } else {
+            // Unreadable/empty lock — treat as stale.
+            true
+        }
+    } else {
+        // Can't read the file — treat as stale.
+        true
+    };
+
+    if stale {
+        let _ = std::fs::remove_file(&path);
+        if try_create(&path) {
+            return Some(UiLock { path });
         }
     }
 
     None
+}
+
+/// Returns true if a process with the given PID is currently running.
+#[cfg(target_os = "linux")]
+fn pid_is_running(pid: u32) -> bool {
+    std::path::Path::new(&format!("/proc/{pid}")).exists()
+}
+
+#[cfg(target_os = "windows")]
+fn pid_is_running(pid: u32) -> bool {
+    use std::process::Command;
+    Command::new("tasklist")
+        .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+        .output()
+        .map(|o| String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()))
+        .unwrap_or(false)
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "windows")))]
+fn pid_is_running(_pid: u32) -> bool {
+    false // Treat as stale on unknown platforms so locks don't stick forever.
 }
 
 // --------------------------------------------------------------------------

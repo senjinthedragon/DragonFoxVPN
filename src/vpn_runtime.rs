@@ -38,21 +38,25 @@ pub struct HealthCheck {
 }
 
 /// Perform a single health check against the current VPN state.
+///
+/// Ping the VPN gateway first. If it is unreachable we skip the traceroute
+/// check entirely - this prevents the health-check thread from hanging on
+/// a slow traceroute while the Pi is mid-reboot or otherwise offline.
 pub fn check_health(adapter: &str, vpn_gateway: &str, isp_gateway: &str) -> HealthCheck {
     let route_exists = if vpn_gateway.is_empty() {
         false
     } else {
         SystemHandler::is_route_active(vpn_gateway, adapter)
     };
-    let vpn_active = if route_exists && !isp_gateway.is_empty() {
-        SystemHandler::check_connection(vpn_gateway, isp_gateway)
-    } else {
-        false
-    };
     let pi_reachable = if vpn_gateway.is_empty() {
         false
     } else {
         SystemHandler::ping_host(vpn_gateway)
+    };
+    let vpn_active = if route_exists && pi_reachable && !isp_gateway.is_empty() {
+        SystemHandler::check_connection(vpn_gateway, isp_gateway)
+    } else {
+        false
     };
     HealthCheck { vpn_active, route_exists, pi_reachable }
 }

@@ -29,6 +29,27 @@ fn log_cmd((stdout, stderr, code): (String, String, i32)) {
     }
 }
 
+/// Set DNS via resolvectl. Downgrades the failure to info-level when
+/// systemd-resolved is simply not running (e.g. Garuda/Arch), since
+/// DNS will still flow correctly through the VPN tunnel in that case.
+fn set_dns_resolvectl(adapter: &str, vpn_dns: &str) {
+    let (_, stderr, code) =
+        run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}"));
+    if code == 0 {
+        info!("  → DNS set via resolvectl ({vpn_dns})");
+    } else if stderr.contains("org.freedesktop.resolve1")
+        || stderr.contains("systemd-resolved")
+        || stderr.contains("activation request failed")
+    {
+        info!(
+            "  → resolvectl unavailable (systemd-resolved not running); \
+             DNS will flow through VPN tunnel"
+        );
+    } else {
+        warn!("  → resolvectl dns failed (exit {code}): {stderr}");
+    }
+}
+
 /// Run a shell command, returning (stdout, stderr, exit_code).
 /// Uses runtime OS detection to choose shell, matching the Python version.
 pub fn run_command(cmd: &str) -> (String, String, i32) {
@@ -129,7 +150,7 @@ impl SystemHandler {
             log_cmd(run_command(&format!(
                 "sudo sysctl -w net.ipv6.conf.{adapter}.disable_ipv6=1"
             )));
-            log_cmd(run_command(&format!("sudo resolvectl dns {adapter} {vpn_dns}")));
+            set_dns_resolvectl(adapter, vpn_dns);
             log_cmd(run_command(&format!("sudo ip route del default dev {adapter}")));
             let result = run_command(&format!(
                 "sudo ip route add default via {vpn_gw} dev {adapter} metric 50"
@@ -159,7 +180,15 @@ impl SystemHandler {
             run_command(&format!(
                 "sudo sysctl -w net.ipv6.conf.{adapter}.disable_ipv6=0"
             ));
-            run_command(&format!("sudo resolvectl revert {adapter}"));
+            let (_, stderr, code) =
+                run_command(&format!("sudo resolvectl revert {adapter}"));
+            if code != 0
+                && !stderr.contains("org.freedesktop.resolve1")
+                && !stderr.contains("systemd-resolved")
+                && !stderr.contains("activation request failed")
+            {
+                warn!("  → resolvectl revert failed (exit {code}): {stderr}");
+            }
         }
     }
 
