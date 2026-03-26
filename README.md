@@ -302,7 +302,7 @@ If you prefer to build from source rather than using a pre-built release binary:
 ### Prerequisites
 
 - **Rust stable toolchain** - install via [rustup.rs](https://rustup.rs)
-- **Windows**: MSVC build tools (Visual Studio Build Tools or Visual Studio with the C++ workload)
+- **Windows**: The default Rust toolchain on Windows uses the MSVC linker, so you need [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022) (free, standalone) or a full Visual Studio install with the "Desktop development with C++" workload — this provides the linker, not any C++ compilation
 - **Linux**: `libappindicator3-dev` or `libayatana-appindicator3-dev` for the system tray
 
 ```bash
