@@ -96,6 +96,11 @@ sudo cp *.ovpn /etc/openvpn/client/configs/
 > **ExpressVPN users**: Log into your account → Downloads → Manual Config → OpenVPN.
 > Download the configs for the locations you want and copy them to the Pi.
 > Each user must download their own - the files contain account-specific credentials.
+>
+> If you want the full server list (160+ locations) without clicking every link by hand,
+> [ExpressVPN OVPN Scraper](https://github.com/senjinthedragon/ExpressVPNScraper) automates
+> the bulk download. Leave `CONF_PREFIX` empty in your config and the filenames will be
+> picked up and grouped correctly without any adjustments.
 
 ### 4. Set up the routing script
 
