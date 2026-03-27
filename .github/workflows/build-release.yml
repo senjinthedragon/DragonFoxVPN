@@ -39,7 +39,7 @@ jobs:
         run: cargo build --release
 
       - name: Package
-        run: Compress-Archive -Path target/release/DragonFoxVPN.exe -DestinationPath DragonFoxVPN-windows.zip
+        run: Compress-Archive -Path target/release/DragonFoxVPN.exe, README.md, LICENSE, backend -DestinationPath DragonFoxVPN-windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -85,7 +85,9 @@ jobs:
         run: cargo build --release
 
       - name: Package
-        run: tar -czf DragonFoxVPN-linux.tar.gz -C target/release DragonFoxVPN
+        run: |
+          cp target/release/DragonFoxVPN .
+          tar -czf DragonFoxVPN-linux.tar.gz DragonFoxVPN README.md LICENSE backend
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
