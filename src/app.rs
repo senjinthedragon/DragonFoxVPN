@@ -166,55 +166,55 @@ fn windows_is_dark_mode() -> bool {
 
 #[cfg(target_os = "windows")]
 fn windows_dark_visuals() -> egui::Visuals {
-    use egui::{Color32, Rounding, Stroke, Visuals};
+    use egui::{Color32, CornerRadius, Stroke, Visuals};
     let accent = Color32::from_rgb(0, 120, 212); // #0078D4 Windows blue
     let mut v = Visuals::dark();
-    v.window_rounding = Rounding::same(8.0);
+    v.window_corner_radius = CornerRadius::same(8);
     v.window_fill = Color32::from_rgb(32, 32, 32);
     v.panel_fill = Color32::from_rgb(45, 45, 45);
     v.window_stroke = Stroke::new(1.0, Color32::from_rgb(60, 60, 60));
     v.selection.bg_fill = accent;
     v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
     v.hyperlink_color = Color32::from_rgb(77, 166, 255);
-    let r = Rounding::same(4.0);
-    v.widgets.noninteractive.rounding = r;
-    v.widgets.inactive.rounding = r;
+    let r = CornerRadius::same(4);
+    v.widgets.noninteractive.corner_radius = r;
+    v.widgets.inactive.corner_radius = r;
     v.widgets.inactive.weak_bg_fill = Color32::from_rgb(62, 62, 62);
     v.widgets.inactive.bg_fill = Color32::from_rgb(62, 62, 62);
-    v.widgets.hovered.rounding = r;
+    v.widgets.hovered.corner_radius = r;
     v.widgets.hovered.weak_bg_fill = Color32::from_rgb(75, 75, 75);
     v.widgets.hovered.bg_fill = Color32::from_rgb(75, 75, 75);
-    v.widgets.active.rounding = r;
+    v.widgets.active.corner_radius = r;
     v.widgets.active.weak_bg_fill = Color32::from_rgb(90, 90, 90);
     v.widgets.active.bg_fill = Color32::from_rgb(90, 90, 90);
-    v.widgets.open.rounding = r;
+    v.widgets.open.corner_radius = r;
     v
 }
 
 #[cfg(target_os = "windows")]
 fn windows_light_visuals() -> egui::Visuals {
-    use egui::{Color32, Rounding, Stroke, Visuals};
+    use egui::{Color32, CornerRadius, Stroke, Visuals};
     let accent = Color32::from_rgb(0, 120, 212);
     let mut v = Visuals::light();
-    v.window_rounding = Rounding::same(8.0);
+    v.window_corner_radius = CornerRadius::same(8);
     v.window_fill = Color32::from_rgb(243, 243, 243);
     v.panel_fill = Color32::from_rgb(255, 255, 255);
     v.window_stroke = Stroke::new(1.0, Color32::from_rgb(200, 200, 200));
     v.selection.bg_fill = accent;
     v.selection.stroke = Stroke::new(1.0, Color32::WHITE);
     v.hyperlink_color = accent;
-    let r = Rounding::same(4.0);
-    v.widgets.noninteractive.rounding = r;
-    v.widgets.inactive.rounding = r;
+    let r = CornerRadius::same(4);
+    v.widgets.noninteractive.corner_radius = r;
+    v.widgets.inactive.corner_radius = r;
     v.widgets.inactive.weak_bg_fill = Color32::from_rgb(230, 230, 230);
     v.widgets.inactive.bg_fill = Color32::from_rgb(230, 230, 230);
-    v.widgets.hovered.rounding = r;
+    v.widgets.hovered.corner_radius = r;
     v.widgets.hovered.weak_bg_fill = Color32::from_rgb(214, 214, 214);
     v.widgets.hovered.bg_fill = Color32::from_rgb(214, 214, 214);
-    v.widgets.active.rounding = r;
+    v.widgets.active.corner_radius = r;
     v.widgets.active.weak_bg_fill = Color32::from_rgb(200, 200, 200);
     v.widgets.active.bg_fill = Color32::from_rgb(200, 200, 200);
-    v.widgets.open.rounding = r;
+    v.widgets.open.corner_radius = r;
     v
 }
 
