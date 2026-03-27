@@ -41,12 +41,12 @@ jobs:
 
       - name: Package
         run: |
-          foreach ($f in Get-ChildItem -Recurse -File README.md, LICENSE, backend) {
+          foreach ($f in Get-ChildItem -Recurse -File README.md, CHANGELOG.md, LICENSE, backend) {
             $content = Get-Content $f.FullName -Raw
             $content = $content -replace "`n", "`r`n"
             Set-Content $f.FullName $content -NoNewline
           }
-          Compress-Archive -Path target/release/DragonFoxVPN.exe, README.md, LICENSE, backend -DestinationPath DragonFoxVPN-windows.zip
+          Compress-Archive -Path target/release/DragonFoxVPN.exe, README.md, CHANGELOG.md, LICENSE, backend -DestinationPath DragonFoxVPN-windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -94,7 +94,7 @@ jobs:
       - name: Package
         run: |
           cp target/release/DragonFoxVPN .
-          tar -czf DragonFoxVPN-linux.tar.gz DragonFoxVPN README.md LICENSE backend
+          tar -czf DragonFoxVPN-linux.tar.gz DragonFoxVPN README.md CHANGELOG.md LICENSE backend
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
