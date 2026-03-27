@@ -39,7 +39,13 @@ jobs:
         run: cargo build --release
 
       - name: Package
-        run: Compress-Archive -Path target/release/DragonFoxVPN.exe, README.md, LICENSE, backend -DestinationPath DragonFoxVPN-windows.zip
+        run: |
+          foreach ($f in Get-ChildItem -Recurse -File README.md, LICENSE, backend) {
+            $content = Get-Content $f.FullName -Raw
+            $content = $content -replace "`n", "`r`n"
+            Set-Content $f.FullName $content -NoNewline
+          }
+          Compress-Archive -Path target/release/DragonFoxVPN.exe, README.md, LICENSE, backend -DestinationPath DragonFoxVPN-windows.zip
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
