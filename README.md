@@ -1,4 +1,4 @@
-# DragonFoxVPN Tray
+# DragonFoxVPN
 
 A system tray utility for managing VPN connections with a modern dark UI.
 
