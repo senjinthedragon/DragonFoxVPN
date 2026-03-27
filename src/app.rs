@@ -387,7 +387,8 @@ impl SettingsWindow {
 }
 
 impl eframe::App for SettingsWindow {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         // On first run, closing without saving exits the whole application.
         if ctx.input(|i| i.viewport().close_requested()) && self.first_run && !self.saved {
             write_daemon_command(DaemonCommand::Quit);
@@ -429,7 +430,7 @@ impl eframe::App for SettingsWindow {
             }
         }
 
-        let panel = egui::TopBottomPanel::top("settings_content").show(ctx, |ui| {
+        let panel = egui::Panel::top("settings_content").show_inside(ui, |ui| {
             ui.add_space(4.0);
             ui.vertical_centered(|ui| {
                 ui.heading(if self.first_run {
@@ -478,7 +479,7 @@ impl eframe::App for SettingsWindow {
                 .find(|(c, _)| *c == self.language.as_str())
                 .map(|(_, n)| *n)
                 .unwrap_or("English");
-            egui::ComboBox::from_id_source("lang_select")
+            egui::ComboBox::from_id_salt("lang_select")
                 .selected_text(current_name)
                 .width(200.0)
                 .show_ui(ui, |ui| {
@@ -524,12 +525,12 @@ impl eframe::App for SettingsWindow {
                     ui.spinner();
                 }
                 if ui.button(t("settings.btn_save")).clicked() {
-                    self.try_save(ctx);
+                    self.try_save(&ctx);
                 }
             });
             ui.add_space(4.0);
         });
-        egui::CentralPanel::default().show(ctx, |_| {});
+        egui::CentralPanel::default().show_inside(ui, |_| {});
         let h = panel.response.rect.height();
         if (h - self.last_height).abs() > 1.0 {
             self.last_height = h;
@@ -632,8 +633,9 @@ impl StatusWindow {
 }
 
 impl eframe::App for StatusWindow {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             ui.vertical_centered(|ui| {
                 ui.colored_label(
                     egui::Color32::from_rgb(0x00, 0x7A, 0xCC),
@@ -657,10 +659,10 @@ impl eframe::App for StatusWindow {
                     _ => (egui::Color32::YELLOW, t("status_win.state_disabled")),
                 };
 
-                egui::Frame::none()
+                egui::Frame::NONE
                     .fill(egui::Color32::from_rgb(0x25, 0x25, 0x26))
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(egui::Margin::same(12.0))
+                    .corner_radius(egui::CornerRadius::same(8))
+                    .inner_margin(egui::Margin::same(12))
                     .show(ui, |ui| {
                         ui.vertical_centered(|ui| {
                             ui.colored_label(
@@ -809,7 +811,8 @@ impl LocationWindow {
 }
 
 impl eframe::App for LocationWindow {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         // Drain background messages.
         while let Ok(msg) = self.msg_rx.try_recv() {
             match msg {
@@ -832,7 +835,7 @@ impl eframe::App for LocationWindow {
                     let flags_dir = crate::config::get_flags_dir();
                     let path = flags_dir.join(format!("{code}.png"));
                     if let Ok(bytes) = std::fs::read(&path) {
-                        self.upload_flag_texture(&code, &bytes, ctx);
+                        self.upload_flag_texture(&code, &bytes, &ctx);
                         self.flag_bytes.insert(code, bytes);
                     }
                     ctx.request_repaint();
@@ -874,7 +877,7 @@ impl eframe::App for LocationWindow {
         }
 
         // Heading, search bar, and status always visible at the top.
-        egui::TopBottomPanel::top("loc_top").show(ctx, |ui| {
+        egui::Panel::top("loc_top").show_inside(ui, |ui| {
             ui.add_space(4.0);
             ui.vertical_centered(|ui| {
                 ui.heading(t("location_win.heading"));
@@ -907,7 +910,7 @@ impl eframe::App for LocationWindow {
         });
 
         // List fills all remaining space.
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             if self.is_loading {
                 ui.add_space(12.0);
                 ui.label(t("location_win.loading"));
@@ -1001,7 +1004,7 @@ impl eframe::App for LocationWindow {
 
                 // Kick off flag fetches for all visible items.
                 for code in visible_iso {
-                    self.ensure_flag(&code, ctx);
+                    self.ensure_flag(&code, &ctx);
                 }
             }
         });
@@ -1024,13 +1027,13 @@ fn fetch_flag_bytes(iso_code: &str) -> Option<Vec<u8>> {
     }
     let _ = std::fs::create_dir_all(&flags_dir);
     let url = format!("https://flagcdn.com/48x36/{iso_code}.png");
-    match ureq::get(&url).timeout(Duration::from_secs(5)).call() {
-        Ok(resp) => {
-            use std::io::Read;
-            let mut bytes = Vec::new();
-            if resp.into_reader().read_to_end(&mut bytes).is_ok() && !bytes.is_empty() {
-                let _ = std::fs::write(&path, &bytes);
-                return Some(bytes);
+    match ureq::get(&url).call() {
+        Ok(mut resp) => {
+            if let Ok(bytes) = resp.body_mut().read_to_vec() {
+                if !bytes.is_empty() {
+                    let _ = std::fs::write(&path, &bytes);
+                    return Some(bytes);
+                }
             }
             None
         }
@@ -1252,7 +1255,8 @@ const KOFI_URL: &str = "https://ko-fi.com/senjinthedragon";
 const BITCOIN_ADDRESS: &str = "bc1qjsaqw6rjcmhv6ywv2a97wfd4zxnae3ncrn8mf9";
 
 impl eframe::App for AboutWindow {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let ctx = ui.ctx().clone();
         // Load and cache the logo texture on the first frame.
         if self.logo.is_none() {
             let bytes = include_bytes!("../assets/senjin_logo.png");
@@ -1265,7 +1269,7 @@ impl eframe::App for AboutWindow {
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.vertical_centered(|ui| {
                     ui.add_space(12.0);

@@ -190,7 +190,7 @@ pub fn apply_cjk_font_if_needed(ctx: &egui::Context) {
     // picker renders correctly on any system, regardless of installed fonts.
     fonts.font_data.insert(
         "lang_glyphs".to_owned(),
-        egui::FontData::from_static(include_bytes!("../assets/lang_glyphs.ttf")),
+        egui::FontData::from_static(include_bytes!("../assets/lang_glyphs.ttf")).into(),
     );
     fonts
         .families
@@ -204,7 +204,7 @@ pub fn apply_cjk_font_if_needed(ctx: &egui::Context) {
         if let Ok(bytes) = std::fs::read(&path) {
             fonts
                 .font_data
-                .insert("cjk".to_owned(), egui::FontData::from_owned(bytes));
+                .insert("cjk".to_owned(), egui::FontData::from_owned(bytes).into());
             let prop = fonts
                 .families
                 .entry(egui::FontFamily::Proportional)

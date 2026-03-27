@@ -1,6 +1,6 @@
 [package]
 name = "dragonfox-vpn"
-version = "2.0.0"
+version = "2.0.1"
 edition = "2021"
 description = "DragonFoxVPN - System tray VPN management application"
 authors = ["Senjin the Dragon"]
@@ -12,19 +12,18 @@ name = "DragonFoxVPN"
 path = "src/main.rs"
 
 [dependencies]
-eframe = { version = "0.28", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
-egui = "0.28"
+eframe = { version = "0.34", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+egui = "0.34"
 tray-icon = { version = "0.21", default-features = false }
-ureq = { version = "2", features = ["native-tls"] }
-native-tls = "0.2"
-scraper = "0.19"
+ureq = { version = "3", features = ["native-tls"] }
+scraper = "0.26"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ctrlc = "3"
 log = "0.4"
 env_logger = "0.11"
-directories = "5"
-image = { version = "0.24", default-features = false, features = ["png"] }
+directories = "6"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.52"

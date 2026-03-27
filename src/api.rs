@@ -11,6 +11,7 @@
 
 use log::{error, warn};
 use scraper::{Html, Selector};
+use std::time::Duration;
 
 /// A single available VPN location from the backend.
 #[derive(Debug, Clone)]
@@ -28,25 +29,25 @@ impl VpnApi {
     /// Returns (locations, current_location_label).
     /// SSL verification is disabled (self-signed cert on Raspberry Pi).
     pub fn fetch_locations(switcher_url: &str) -> Result<(Vec<Location>, Option<String>), String> {
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        let agent = ureq::AgentBuilder::new()
-            .tls_connector(std::sync::Arc::new(tls))
+        let tls = ureq::tls::TlsConfig::builder()
+            .disable_verification(true)
             .build();
 
-        let response = agent
-            .get(switcher_url)
-            .timeout(std::time::Duration::from_secs(5))
-            .call()
-            .map_err(|e| {
-                error!("Failed to fetch VPN locations: {e}");
-                e.to_string()
-            })?;
+        let config = ureq::Agent::config_builder()
+            .tls_config(tls)
+            .timeout_global(Some(Duration::from_secs(5)))
+            .build();
+        let agent = ureq::Agent::new_with_config(config);
 
-        let body = response.into_string().map_err(|e| e.to_string())?;
+        let response = agent.get(switcher_url).call().map_err(|e| {
+            error!("Failed to fetch VPN locations: {e}");
+            e.to_string()
+        })?;
+
+        let body = response
+            .into_body()
+            .read_to_string()
+            .map_err(|e| e.to_string())?;
         Ok(parse_locations(&body))
     }
 
@@ -59,33 +60,34 @@ impl VpnApi {
     /// body is preserved across the full redirect chain (e.g.
     /// http://host → http://host/ → https://host/).
     pub fn switch_location(switcher_url: &str, location_value: &str) -> Result<String, String> {
-        let tls = native_tls::TlsConnector::builder()
-            .danger_accept_invalid_certs(true)
-            .build()
-            .map_err(|e| e.to_string())?;
-
-        let agent = ureq::AgentBuilder::new()
-            .tls_connector(std::sync::Arc::new(tls))
-            .redirects(0)
+        let tls = ureq::tls::TlsConfig::builder()
+            .disable_verification(true)
             .build();
+
+        let config = ureq::Agent::config_builder()
+            .tls_config(tls)
+            .max_redirects(0)
+            .timeout_global(Some(Duration::from_secs(45)))
+            .build();
+        let agent = ureq::Agent::new_with_config(config);
 
         let mut url = ensure_trailing_slash(switcher_url);
 
         for hop in 0..5u8 {
             log::info!("switch_location: POST to {url} (hop {hop}) location={location_value}");
 
-            match agent
-                .post(&url)
-                .timeout(std::time::Duration::from_secs(45))
-                .send_form(&[("location", location_value)])
-            {
-                Ok(response) => {
-                    let status = response.status();
+            match agent.post(&url).send_form([("location", location_value)]) {
+                Ok(mut response) => {
+                    let status = response.status().as_u16();
                     log::info!("switch_location: HTTP {status}");
 
-                    // With redirects(0), ureq returns 3xx as Ok - handle manually.
+                    // With max_redirects(0), ureq returns 3xx as Ok - handle manually.
                     if (301..=308).contains(&status) {
-                        match response.header("location") {
+                        match response
+                            .headers()
+                            .get("location")
+                            .and_then(|v| v.to_str().ok())
+                        {
                             Some(loc) => {
                                 log::info!("switch_location: redirect {status} → {loc}");
                                 url = resolve_redirect(&url, loc);
@@ -97,7 +99,10 @@ impl VpnApi {
                         }
                     }
 
-                    let html = response.into_string().map_err(|e| e.to_string())?;
+                    let html = response
+                        .body_mut()
+                        .read_to_string()
+                        .map_err(|e| e.to_string())?;
 
                     if html.contains("class='error'") || html.contains("class=\"error\"") {
                         let msg = extract_php_error(&html).unwrap_or_else(|| {
@@ -115,17 +120,6 @@ impl VpnApi {
                             Err("Switch did not appear to take effect (no active location in response)".to_string())
                         }
                     };
-                }
-                Err(ureq::Error::Status(code, response))
-                    if matches!(code, 301 | 302 | 303 | 307 | 308) =>
-                {
-                    match response.header("location") {
-                        Some(loc) => {
-                            log::info!("switch_location: redirect {code} → {loc}");
-                            url = resolve_redirect(&url, loc);
-                        }
-                        None => return Err(format!("Redirect {code} with no Location header")),
-                    }
                 }
                 Err(e) => {
                     error!("switch_location failed: {e}");
