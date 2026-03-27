@@ -221,7 +221,7 @@ Use the **Test Connection** button to verify all three values before saving - it
 
 ### Settings
 
-Access **Settings...** from the tray menu at any time to update network configuration or adjust behaviour. Settings are organised into three sections:
+Access **Settings...** from the tray menu while the VPN is disconnected to update network configuration or adjust behaviour. Settings are organised into three sections:
 
 - **Network**: VPN Switcher URL, VPN Server IP, Router IP, and the Test Connection button.
 - **Behavior**: Auto-Connect on start, Auto-Reconnect if server returns, and Run on Startup (Windows only).
