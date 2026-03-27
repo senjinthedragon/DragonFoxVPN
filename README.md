@@ -203,11 +203,7 @@ Add this line, replacing `yourusername` with your actual username:
 yourusername ALL=(root) NOPASSWD: /sbin/ip, /usr/bin/resolvectl, /sbin/sysctl, /usr/bin/systemd-resolve
 ```
 
-Then run the app normally (no sudo):
-
-```bash
-./target/release/DragonFoxVPN
-```
+Then run the app normally (no sudo).
 
 ### First Run
 
@@ -239,11 +235,7 @@ Run `DragonFoxVPN.exe` - Windows will automatically prompt for administrator rig
 
 ### Linux
 
-```bash
-./target/release/DragonFoxVPN
-```
-
-(No sudo needed if you followed the sudoers step above.)
+Run `DragonFoxVPN` from wherever you placed the binary. No sudo needed if you followed the sudoers step above.
 
 ## Configuration
 
@@ -323,6 +315,8 @@ The output binary is placed at:
 
 - **Linux**: `target/release/DragonFoxVPN`
 - **Windows**: `target\release\DragonFoxVPN.exe`
+
+Move it somewhere on your PATH (e.g. `/usr/local/bin` on Linux) before running.
 
 On Windows you can also use the included PowerShell script:
 
