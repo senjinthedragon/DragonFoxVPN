@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-07-21
+
+### Changed
+- Bumped winreg 0.52.0 → 0.56.0
+- Bumped eframe and egui 0.34.0 → 0.34.1
+- Bumped notify-rust 4.12.0 → 4.14.0
+- Bumped tray-icon 0.21.3 → 0.22.0
+
 ## [2.0.1] - 2026-03-27
 
 ### Changed
