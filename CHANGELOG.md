@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-07-21
+
+### Security
+- Updated openssl 0.10.76 → 0.10.81, resolving 9 advisories (out-of-bounds writes/reads, undefined behavior, buffer overflows in rust-openssl)
+- Updated rustls-webpki 0.103.10 → 0.103.13, resolving 3 advisories (DoS panic on malformed CRL, incorrect name-constraint acceptance)
+- Bumped tray-icon 0.22.0 → 0.24.1 (and muda 0.17 → 0.19) to pick up dependency updates; explicitly enabled the `gtk` feature (without `libxdo`) to preserve the libxdo-free Linux build from a prior release
+
+### Known limitation
+- `glib` remains on 0.18.5 (patched version is 0.20.0). It's pulled in transitively through the legacy `gtk` 0.18 (gtk3-rs) bindings, which have no release newer than 0.18.2 — the upstream project has moved to `gtk4-rs`. Fixing this requires migrating off gtk3-rs entirely and is out of scope for this release.
+
 ## [2.0.2] - 2026-07-21
 
 ### Changed
