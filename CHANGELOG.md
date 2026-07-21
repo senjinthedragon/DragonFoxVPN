@@ -9,8 +9,8 @@
 - Updated rustls-webpki 0.103.10 → 0.103.13, resolving 3 advisories (DoS panic on malformed CRL, incorrect name-constraint acceptance)
 - Bumped tray-icon 0.22.0 → 0.24.1 (and muda 0.17 → 0.19) to pick up dependency updates; explicitly enabled the `gtk` feature (without `libxdo`) to preserve the libxdo-free Linux build from a prior release
 
-### Known limitation
-- `glib` remains on 0.18.5 (patched version is 0.20.0). It's pulled in transitively through the legacy `gtk` 0.18 (gtk3-rs) bindings, which have no release newer than 0.18.2 — the upstream project has moved to `gtk4-rs`. Fixing this requires migrating off gtk3-rs entirely and is out of scope for this release.
+### Accepted risk
+- `glib` remains on 0.18.5 (patched version is 0.20.0), medium-severity soundness bug in `VariantStrIter`. It's pulled in transitively through `tray-icon`'s only Linux backend (`libappindicator`, a GTK3 library) — `gtk`/gtk3-rs bindings top out at 0.18.2 upstream and there is no GTK4-based appindicator equivalent. Fixing this would mean dropping `tray-icon` on Linux for a hand-rolled D-Bus StatusNotifierItem tray implementation, a major undertaking disproportionate to a soundness bug in an Iterator impl this app never exercises (no untrusted GVariant data is parsed). Accepted as a known, permanent limitation rather than deferred.
 
 ## [2.0.2] - 2026-07-21
 
